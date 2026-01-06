@@ -13,6 +13,8 @@ use super::{TTSError, TTSProvider};
 
 const DEFAULT_REGION: &str = "us-east-1";
 
+const CREDENTIALS_ERROR_MSG: &str = "AWS credentials not found. Please configure credentials via:\n  - Environment variables: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY\n  - Or credentials file: ~/.aws/credentials";
+
 /// AWS Polly TTS provider using the official AWS SDK.
 pub struct PollyTTSProvider {
     /// AWS Polly client
@@ -144,6 +146,70 @@ impl PollyTTSProvider {
             }
         }
         None
+    }
+
+    /// Check if AWS credentials are available.
+    ///
+    /// Returns `Ok(())` if credentials are found, or an error message if not.
+    pub fn check_credentials() -> Result<(), String> {
+        // Check environment variables first (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY)
+        if std::env::var("AWS_ACCESS_KEY_ID").is_ok() && std::env::var("AWS_SECRET_ACCESS_KEY").is_ok() {
+            return Ok(());
+        }
+
+        // Check for credentials file
+        if let Some(home) = dirs::home_dir() {
+            let credentials_path = home.join(".aws").join("credentials");
+            if credentials_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&credentials_path) {
+                    let profile = std::env::var("AWS_PROFILE").unwrap_or_else(|_| "default".to_string());
+                    let section_header = if profile == "default" {
+                        "[default]".to_string()
+                    } else {
+                        format!("[profile {}]", profile)
+                    };
+
+                    if Self::parse_credentials_from_section(&content, &section_header) {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        Err(CREDENTIALS_ERROR_MSG.to_string())
+    }
+
+    /// Parse credentials from a specific section in the credentials file.
+    /// Returns true if both access key and secret key are found and non-empty.
+    fn parse_credentials_from_section(content: &str, section_header: &str) -> bool {
+        let mut in_section = false;
+        let mut has_access_key = false;
+        let mut has_secret_key = false;
+
+        for line in content.lines() {
+            let line = line.trim();
+            if line.starts_with('[') {
+                in_section = line.eq_ignore_ascii_case(section_header);
+                continue;
+            }
+            if in_section {
+                if line.starts_with("aws_access_key_id") {
+                    if let Some(value) = line.split('=').nth(1) {
+                        if !value.trim().is_empty() {
+                            has_access_key = true;
+                        }
+                    }
+                } else if line.starts_with("aws_secret_access_key") {
+                    if let Some(value) = line.split('=').nth(1) {
+                        if !value.trim().is_empty() {
+                            has_secret_key = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        has_access_key && has_secret_key
     }
 }
 

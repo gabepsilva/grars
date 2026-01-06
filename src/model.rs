@@ -58,6 +58,7 @@ pub struct App {
     pub current_window_id: Option<window::Id>,
     pub main_window_id: Option<window::Id>,
     pub pending_text: Option<String>,
+    pub error_message: Option<String>,
 }
 
 impl Default for App {
@@ -74,6 +75,7 @@ impl Default for App {
             current_window_id: None,
             main_window_id: None,
             pending_text: None,
+            error_message: None,
         }
     }
 }
@@ -95,6 +97,7 @@ impl App {
             current_window_id: None,
             main_window_id: None,
             pending_text,
+            error_message: None,
         }
     }
 }

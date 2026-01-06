@@ -53,8 +53,17 @@ fn white_text(content: &str, size: u32) -> text::Text<'_> {
         })
 }
 
+/// Helper to create red error text with consistent styling.
+fn error_text(content: &str, size: u32) -> text::Text<'_> {
+    text(content)
+        .size(size)
+        .style(|_theme| iced::widget::text::Style {
+            color: Some(Color::from_rgb(1.0, 0.3, 0.3)),
+        })
+}
+
 /// Settings window view - floating modal style
-pub fn settings_window_view<'a>(app: &App) -> Element<'a, Message> {
+pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
     let close_button = button(
         container(white_text("✕", 20))
             .width(Length::Fixed(32.0))
@@ -64,6 +73,34 @@ pub fn settings_window_view<'a>(app: &App) -> Element<'a, Message> {
     )
     .style(circle_button_style)
     .on_press(Message::CloseSettings);
+
+    // Error message display (if present)
+    let error_display: Element<'a, Message> = if let Some(error_msg) = &app.error_message {
+        column![
+            Space::new().height(Length::Fixed(8.0)),
+            container(
+                error_text(error_msg, 12)
+                    .width(Length::Fill)
+            )
+            .width(Length::Fill)
+            .padding(8)
+            .style(|_theme| {
+                iced::widget::container::Style {
+                    background: Some(iced::Background::Color(Color::from_rgba(1.0, 0.2, 0.2, 0.2))),
+                    border: iced::Border {
+                        color: Color::from_rgb(1.0, 0.3, 0.3),
+                        width: 1.0,
+                        radius: 4.0.into(),
+                    },
+                    ..Default::default()
+                }
+            }),
+        ]
+        .spacing(4)
+        .into()
+    } else {
+        column![].spacing(0).into()
+    };
 
     let provider_selector = column![
         white_text("TTS Provider", 18),
@@ -85,6 +122,7 @@ pub fn settings_window_view<'a>(app: &App) -> Element<'a, Message> {
             .style(white_radio_style),
         ]
         .spacing(16),
+        error_display,
     ]
     .spacing(4);
 

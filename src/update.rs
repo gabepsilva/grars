@@ -12,6 +12,30 @@ use crate::providers::{PiperTTSProvider, PollyTTSProvider, TTSProvider};
 const SKIP_SECONDS: f32 = 5.0;
 const NUM_BANDS: usize = 10;
 
+/// Check if an error string indicates an AWS credential/authentication issue.
+fn is_aws_credential_error(error_str: &str) -> bool {
+    error_str.contains("credentials")
+        || error_str.contains("authentication")
+        || error_str.contains("Unauthorized")
+        || error_str.contains("dispatch failure")
+        || error_str.contains("AWS")
+}
+
+/// Open the settings window with error display enabled.
+/// Returns the window ID and task mapped to Message::WindowOpened.
+fn open_settings_window() -> (window::Id, Task<Message>) {
+    let (window_id, task) = window::open(window::Settings {
+        size: Size::new(760.0, 360.0),
+        resizable: false,
+        decorations: true,
+        transparent: false,
+        visible: true,
+        position: window::Position::Centered,
+        ..Default::default()
+    });
+    (window_id, task.map(Message::WindowOpened))
+}
+
 /// Initialize TTS provider and start speaking with the given text.
 /// Returns true if initialization was successful, false otherwise.
 fn initialize_tts(app: &mut App, text: String, context: &str) -> bool {
@@ -21,6 +45,17 @@ fn initialize_tts(app: &mut App, text: String, context: &str) -> bool {
         bytes = text.len(),
         "Initializing TTS provider with text"
     );
+
+    // Check AWS credentials before attempting to initialize
+    if app.selected_backend == TTSBackend::AwsPolly {
+        if let Err(e) = PollyTTSProvider::check_credentials() {
+            warn!("AWS credentials not found during initialization");
+            app.error_message = Some(e);
+            return false;
+        }
+        // Clear any previous error if credentials are found
+        app.error_message = None;
+    }
 
     let provider_result: Result<Box<dyn TTSProvider>, _> = match app.selected_backend {
         TTSBackend::Piper => {
@@ -35,16 +70,34 @@ fn initialize_tts(app: &mut App, text: String, context: &str) -> bool {
         Ok(mut provider) => {
             if let Err(e) = provider.speak(&text) {
                 error!(error = %e, "TTS speak failed");
+                // Check if it's a credential/authentication error and set appropriate message
+                if app.selected_backend == TTSBackend::AwsPolly
+                    && is_aws_credential_error(&format!("{}", e))
+                {
+                    if let Err(cred_err) = PollyTTSProvider::check_credentials() {
+                        app.error_message = Some(cred_err);
+                    }
+                }
                 false
             } else {
                 info!(context, "TTS playback started successfully");
                 app.provider = Some(provider);
                 app.playback_state = PlaybackState::Playing;
+                // Clear error on success
+                app.error_message = None;
                 true
             }
         }
         Err(e) => {
             error!(error = %e, "Failed to initialize TTS provider");
+            // Set error message for AWS credential issues
+            if app.selected_backend == TTSBackend::AwsPolly
+                && is_aws_credential_error(&format!("{}", e))
+            {
+                if let Err(cred_err) = PollyTTSProvider::check_credentials() {
+                    app.error_message = Some(cred_err);
+                }
+            }
             false
         }
     }
@@ -160,6 +213,24 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
         Message::ProviderSelected(backend) => {
             info!(?backend, "TTS provider selected");
             app.selected_backend = backend;
+            
+            // Check AWS credentials if AWS Polly is selected
+            if backend == TTSBackend::AwsPolly {
+                match PollyTTSProvider::check_credentials() {
+                    Ok(()) => {
+                        app.error_message = None;
+                        info!("AWS credentials found");
+                    }
+                    Err(e) => {
+                        app.error_message = Some(e);
+                        warn!("AWS credentials not found when selecting AWS Polly");
+                    }
+                }
+            } else {
+                // Clear error message when switching to Piper
+                app.error_message = None;
+            }
+            
             // Persist the selected backend so future runs remember the choice.
             config::save_voice_provider(backend);
             Task::none()
@@ -181,7 +252,15 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
 
                 // Initialize TTS provider and start speaking now that window is visible
                 if let Some(text) = app.pending_text.take() {
-                    initialize_tts(app, text, "WindowOpened");
+                    let init_success = initialize_tts(app, text, "WindowOpened");
+                    // If initialization failed and there's an error message, auto-open settings
+                    if !init_success && app.error_message.is_some() && app.settings_window_id.is_none() {
+                        let (window_id, task) = open_settings_window();
+                        app.settings_window_id = Some(window_id);
+                        app.show_settings_modal = true;
+                        app.current_window_id = Some(id);
+                        return task;
+                    }
                 } else {
                     warn!("Window opened but no pending text to speak");
                 }
@@ -208,7 +287,14 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             if app.main_window_id.is_none() {
                 if let Some(text) = app.pending_text.take() {
                     info!("Fallback: Initializing TTS (WindowOpened event may have been missed)");
-                    initialize_tts(app, text, "Fallback");
+                    let init_success = initialize_tts(app, text, "Fallback");
+                    // If initialization failed and there's an error message, auto-open settings
+                    if !init_success && app.error_message.is_some() && app.settings_window_id.is_none() {
+                        let (window_id, task) = open_settings_window();
+                        app.settings_window_id = Some(window_id);
+                        app.show_settings_modal = true;
+                        return task;
+                    }
                 } else {
                     trace!("Fallback: No pending text to initialize");
                 }

@@ -5,7 +5,7 @@
 
 mod audio_player;
 mod piper;
-mod polly;
+pub mod polly;
 
 pub use piper::PiperTTSProvider;
 pub use polly::PollyTTSProvider;
