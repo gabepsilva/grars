@@ -36,6 +36,7 @@ pub struct App {
     pub settings_window_id: Option<window::Id>,
     pub current_window_id: Option<window::Id>,
     pub main_window_id: Option<window::Id>,
+    pub pending_text: Option<String>,
 }
 
 impl Default for App {
@@ -49,24 +50,24 @@ impl Default for App {
             settings_window_id: None,
             current_window_id: None,
             main_window_id: None,
+            pending_text: None,
         }
     }
 }
 
 impl App {
-    /// Create a new app with the given TTS provider.
-    pub fn new(provider: Option<PiperTTSProvider>) -> Self {
+    /// Create a new app with pending text to speak.
+    pub fn new(pending_text: Option<String>) -> Self {
         Self {
-            playback_state: provider
-                .as_ref()
-                .map_or(PlaybackState::Stopped, |_| PlaybackState::Playing),
+            playback_state: PlaybackState::Stopped,
             progress: 0.0,
             frequency_bands: vec![0.0; 10],
-            provider,
+            provider: None,
             show_settings_modal: false,
             settings_window_id: None,
             current_window_id: None,
             main_window_id: None,
+            pending_text,
         }
     }
 }

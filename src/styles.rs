@@ -1,7 +1,7 @@
 //! Custom style functions for UI components (Iced 0.13+ closure-based API)
 
 use iced::widget::{button, container};
-use iced::{Color, Theme, Background, Border};
+use iced::{Background, Border, Color, Theme};
 
 pub fn window_style(_theme: &Theme) -> container::Style {
     container::Style {
@@ -53,6 +53,16 @@ pub fn modal_content_style(_theme: &Theme) -> container::Style {
             width: 1.0,
             radius: 8.0.into(),
         },
+        ..Default::default()
+    }
+}
+
+/// Transparent button style for icon-only controls (e.g., settings gear).
+pub fn transparent_button_style(_theme: &Theme, _status: button::Status) -> button::Style {
+    button::Style {
+        background: None,
+        text_color: Color::WHITE,
+        border: Border::default(),
         ..Default::default()
     }
 }

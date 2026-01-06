@@ -6,21 +6,20 @@ use iced::window;
 use std::cell::RefCell;
 
 use crate::model::{App, Message, PlaybackState};
-use crate::providers::PiperTTSProvider;
 use crate::update;
 use crate::view;
 
 thread_local! {
-    static INITIAL_PROVIDER: RefCell<Option<Option<PiperTTSProvider>>> = const { RefCell::new(None) };
+    static INITIAL_TEXT: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
-pub fn set_initial_provider(provider: Option<PiperTTSProvider>) {
-    INITIAL_PROVIDER.with(|p| *p.borrow_mut() = Some(provider));
+pub fn set_initial_text(text: Option<String>) {
+    INITIAL_TEXT.with(|t| *t.borrow_mut() = text);
 }
 
 pub fn new() -> (App, Task<Message>) {
-    let provider = INITIAL_PROVIDER.with(|p| p.borrow_mut().take().flatten());
-    (App::new(provider), Task::none())
+    let text = INITIAL_TEXT.with(|t| t.borrow_mut().take());
+    (App::new(text), Task::none())
 }
 
 pub fn title(app: &App) -> String {

@@ -4,7 +4,7 @@ use iced::window;
 use iced::{Task, Size};
 
 use crate::model::{App, Message, PlaybackState};
-use crate::providers::TTSProvider;
+use crate::providers::{PiperTTSProvider, TTSProvider};
 
 const SKIP_SECONDS: f32 = 5.0;
 const NUM_BANDS: usize = 10;
@@ -92,6 +92,24 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             eprintln!("Window opened: {:?}", id);
             if app.main_window_id.is_none() {
                 app.main_window_id = Some(id);
+                
+                // Initialize piper and start speaking now that window is visible
+                if let Some(text) = app.pending_text.take() {
+                    eprintln!("Initializing Piper TTS for {} bytes", text.len());
+                    match PiperTTSProvider::new() {
+                        Ok(mut provider) => {
+                            if let Err(e) = provider.speak(&text) {
+                                eprintln!("TTS error: {e}");
+                            } else {
+                                app.provider = Some(provider);
+                                app.playback_state = PlaybackState::Playing;
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to initialize Piper TTS: {e}");
+                        }
+                    }
+                }
             }
             app.current_window_id = Some(id);
             Task::none()
