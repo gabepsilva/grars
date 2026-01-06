@@ -78,7 +78,7 @@ impl Sandbox for App {
         }
     }
 
-    fn view(&self) -> Element<Message> {
+    fn view(&self) -> Element<'_, Message> {
         // Speaker icon
         let speaker_icon = text("🔊")
             .size(24)
