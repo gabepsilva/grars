@@ -1,72 +1,59 @@
-/// Custom style sheets for UI components
+/// Custom style functions for UI components (Iced 0.13+ closure-based API)
 
 use iced::widget::{button, container};
-use iced::{Color, Theme};
+use iced::{Color, Theme, Background, Border};
 
-pub struct WindowStyle;
-
-impl container::StyleSheet for WindowStyle {
-    type Style = Theme;
-    
-    fn appearance(&self, _style: &Self::Style) -> container::Appearance {
-        container::Appearance {
-            background: Some(iced::Background::Color(Color::BLACK)),
-            border: iced::Border {
-                color: Color::WHITE,
-                width: 1.0,
-                radius: 8.0.into(),
-            },
-            ..Default::default()
-        }
+pub fn window_style(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::BLACK)),
+        border: Border {
+            color: Color::WHITE,
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
     }
 }
 
-pub struct WaveBarStyle;
-
-impl container::StyleSheet for WaveBarStyle {
-    type Style = Theme;
-    
-    fn appearance(&self, _style: &Self::Style) -> container::Appearance {
-        container::Appearance {
-            background: Some(iced::Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.6))),
-            border: iced::Border {
-                radius: 1.5.into(),
-                ..Default::default()
-            },
+pub fn wave_bar_style(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.6))),
+        border: Border {
+            radius: 1.5.into(),
             ..Default::default()
-        }
+        },
+        ..Default::default()
     }
 }
 
-pub struct CircleButtonStyle;
-
-impl button::StyleSheet for CircleButtonStyle {
-    type Style = Theme;
+pub fn circle_button_style(_theme: &Theme, status: button::Status) -> button::Style {
+    let base_bg = match status {
+        button::Status::Active => Color::from_rgba(1.0, 1.0, 1.0, 0.15),
+        button::Status::Hovered => Color::from_rgba(1.0, 1.0, 1.0, 0.25),
+        button::Status::Pressed => Color::from_rgba(1.0, 1.0, 1.0, 0.35),
+        _ => Color::from_rgba(1.0, 1.0, 1.0, 0.15),
+    };
     
-    fn active(&self, _style: &Self::Style) -> button::Appearance {
-        button::Appearance {
-            background: Some(iced::Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.15))),
-            text_color: Color::WHITE,
-            border: iced::Border {
-                radius: 18.0.into(),
-                ..Default::default()
-            },
+    button::Style {
+        background: Some(Background::Color(base_bg)),
+        text_color: Color::WHITE,
+        border: Border {
+            radius: 18.0.into(),
             ..Default::default()
-        }
+        },
+        ..Default::default()
     }
-    
-    fn hovered(&self, style: &Self::Style) -> button::Appearance {
-        button::Appearance {
-            background: Some(iced::Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.25))),
-            ..self.active(style)
-        }
-    }
-    
-    fn pressed(&self, style: &Self::Style) -> button::Appearance {
-        button::Appearance {
-            background: Some(iced::Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.35))),
-            ..self.active(style)
-        }
+}
+
+pub fn modal_content_style(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgb(0.1, 0.1, 0.1))),
+        border: Border {
+            color: Color::WHITE,
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
     }
 }
 

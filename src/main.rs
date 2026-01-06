@@ -8,10 +8,8 @@ mod system;
 mod update;
 mod view;
 
-use iced::{Application, Settings, Size};
+use iced::{application, Size};
 
-use crate::app::AppFlags;
-use crate::model::App;
 use crate::providers::{PiperTTSProvider, TTSProvider};
 
 fn main() -> iced::Result {
@@ -41,15 +39,23 @@ fn main() -> iced::Result {
         }
     });
 
-    App::run(Settings {
-        flags: AppFlags { provider },
-        window: iced::window::Settings {
+    // Store provider in a way that can be accessed by the app
+    // For now, we'll initialize the app and set provider in the first update
+    crate::app::set_initial_provider(provider);
+    
+    application(
+        crate::app::new,
+        crate::app::update,
+        crate::app::view
+    )
+        .title(crate::app::title)
+        .subscription(crate::app::subscription)
+        .window(iced::window::Settings {
             size: Size::new(380.0, 70.0),
             resizable: false,
             decorations: false,
             transparent: true,
             ..Default::default()
-        },
-        ..Default::default()
-    })
+        })
+        .run()
 }

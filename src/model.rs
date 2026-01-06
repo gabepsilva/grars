@@ -1,5 +1,6 @@
 //! Domain model for the application state
 
+use iced::window;
 use crate::providers::PiperTTSProvider;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -16,6 +17,10 @@ pub enum Message {
     PlayPause,
     Stop,
     Tick,
+    Settings,
+    CloseSettings,
+    WindowOpened(window::Id),
+    WindowClosed(window::Id),
 }
 
 /// Application state.
@@ -27,6 +32,25 @@ pub struct App {
     pub progress: f32,
     pub frequency_bands: Vec<f32>,
     pub provider: Option<PiperTTSProvider>,
+    pub show_settings_modal: bool,
+    pub settings_window_id: Option<window::Id>,
+    pub current_window_id: Option<window::Id>,
+    pub main_window_id: Option<window::Id>,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            playback_state: PlaybackState::Stopped,
+            progress: 0.0,
+            frequency_bands: vec![0.0; 10],
+            provider: None,
+            show_settings_modal: false,
+            settings_window_id: None,
+            current_window_id: None,
+            main_window_id: None,
+        }
+    }
 }
 
 impl App {
@@ -39,6 +63,10 @@ impl App {
             progress: 0.0,
             frequency_bands: vec![0.0; 10],
             provider,
+            show_settings_modal: false,
+            settings_window_id: None,
+            current_window_id: None,
+            main_window_id: None,
         }
     }
 }

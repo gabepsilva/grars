@@ -1,7 +1,7 @@
 //! Business logic for state transitions
 
 use iced::window;
-use iced::Command;
+use iced::{Task, Size};
 
 use crate::model::{App, Message, PlaybackState};
 use crate::providers::TTSProvider;
@@ -9,23 +9,21 @@ use crate::providers::TTSProvider;
 const SKIP_SECONDS: f32 = 5.0;
 const NUM_BANDS: usize = 10;
 
-pub fn update(app: &mut App, message: Message) -> Command<Message> {
+pub fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::SkipBackward => {
             if let Some(ref mut provider) = app.provider {
                 provider.skip_backward(SKIP_SECONDS);
-                // Position is updated synchronously in seek_to(), so progress is accurate immediately
                 app.progress = provider.get_progress();
             }
-            Command::none()
+            Task::none()
         }
         Message::SkipForward => {
             if let Some(ref mut provider) = app.provider {
                 provider.skip_forward(SKIP_SECONDS);
                 app.progress = provider.get_progress();
-                // Don't close here - let Tick message handle it when playback actually finishes
             }
-            Command::none()
+            Task::none()
         }
         Message::PlayPause => {
             if let Some(ref mut provider) = app.provider {
@@ -40,12 +38,10 @@ pub fn update(app: &mut App, message: Message) -> Command<Message> {
                             app.playback_state = PlaybackState::Playing;
                         }
                     }
-                    PlaybackState::Stopped => {
-                        // Can't resume from stopped - would need to re-speak
-                    }
+                    PlaybackState::Stopped => {}
                 }
             }
-            Command::none()
+            Task::none()
         }
         Message::Stop => {
             if let Some(ref mut provider) = app.provider {
@@ -54,24 +50,62 @@ pub fn update(app: &mut App, message: Message) -> Command<Message> {
             app.playback_state = PlaybackState::Stopped;
             app.progress = 0.0;
             app.frequency_bands = vec![0.0; NUM_BANDS];
-            // Close window when stopped
-            window::close(window::Id::MAIN)
+            window::latest().and_then(window::close)
         }
         Message::Tick => {
             if let Some(ref provider) = app.provider {
-                // Update progress from provider
                 app.progress = provider.get_progress();
-
-                // Update frequency bands for visualization
                 app.frequency_bands = provider.get_frequency_bands(NUM_BANDS);
 
-                // Check if playback finished
                 if !provider.is_playing() && !provider.is_paused() {
                     app.playback_state = PlaybackState::Stopped;
-                    return window::close(window::Id::MAIN);
+                    return window::latest().and_then(window::close);
                 }
             }
-            Command::none()
+            Task::none()
+        }
+        Message::Settings => {
+            eprintln!("Settings clicked");
+            let (window_id, task) = window::open(window::Settings {
+                size: Size::new(760.0, 140.0),
+                resizable: false,
+                decorations: true,
+                transparent: false,
+                visible: true,
+                position: window::Position::Centered,
+                ..Default::default()
+            });
+            eprintln!("Opening settings window with ID: {:?}", window_id);
+            app.settings_window_id = Some(window_id);
+            app.show_settings_modal = true;
+            task.map(|id| Message::WindowOpened(id))
+        }
+        Message::CloseSettings => {
+            app.show_settings_modal = false;
+            if let Some(window_id) = app.settings_window_id.take() {
+                window::close(window_id)
+            } else {
+                Task::none()
+            }
+        }
+        Message::WindowOpened(id) => {
+            eprintln!("Window opened: {:?}", id);
+            if app.main_window_id.is_none() {
+                app.main_window_id = Some(id);
+            }
+            app.current_window_id = Some(id);
+            Task::none()
+        }
+        Message::WindowClosed(id) => {
+            eprintln!("Window closed: {:?}", id);
+            if app.settings_window_id == Some(id) {
+                app.settings_window_id = None;
+                app.show_settings_modal = false;
+            }
+            if app.current_window_id == Some(id) {
+                app.current_window_id = None;
+            }
+            Task::none()
         }
     }
 }
