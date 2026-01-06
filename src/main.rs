@@ -50,6 +50,7 @@ fn main() -> iced::Result {
             resizable: false,
             decorations: false,
             transparent: true,
+            visible: true,
             ..Default::default()
         })
         .run()

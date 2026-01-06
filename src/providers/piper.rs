@@ -25,8 +25,9 @@ impl PiperTTSProvider {
     /// Create a new Piper TTS provider with default configuration.
     ///
     /// Searches for piper binary and model in standard locations:
-    /// 1. User installation: `~/.local/share/grars/`
-    /// 2. System PATH
+    /// 1. Project root: `./venv/bin/piper` (development)
+    /// 2. User installation: `~/.local/share/grars/venv/bin/piper` (XDG Base Directory)
+    /// 3. System PATH
     pub fn new() -> Result<Self, TTSError> {
         Self::with_config(None, None)
     }
@@ -74,7 +75,19 @@ impl PiperTTSProvider {
 
     /// Find the piper binary in standard locations.
     fn find_piper_binary() -> PathBuf {
-        // Check user installation first
+        // Check project-local virtualenv first (development)
+        if let Ok(current_dir) = env::current_dir() {
+            let project_piper = current_dir.join("venv").join("bin").join("piper");
+            if project_piper.exists() {
+                debug!(
+                    path = %project_piper.display(),
+                    "Using project-local piper binary"
+                );
+                return project_piper;
+            }
+        }
+
+        // Check user installation (XDG Base Directory standard: ~/.local/share/grars)
         if let Some(data_dir) = dirs::data_dir() {
             let user_piper = data_dir.join("grars").join("venv").join("bin").join("piper");
             if user_piper.exists() {
@@ -83,27 +96,13 @@ impl PiperTTSProvider {
             }
         }
 
-        // Check dad project (grafl) venv for development
-        if let Some(home) = dirs::home_dir() {
-            let grafl_piper = home
-                .join("git_projects")
-                .join("grafl")
-                .join("venv")
-                .join("bin")
-                .join("piper");
-            if grafl_piper.exists() {
-                debug!(path = %grafl_piper.display(), "Using grafl dev piper binary");
-                return grafl_piper;
-            }
-        }
-
         // Check system PATH
         if let Ok(output) = Command::new("which").arg("piper").output() {
             if output.status.success() {
-                if let Ok(path) = String::from_utf8(output.stdout) {
-                    let path = path.trim();
-                    if !path.is_empty() {
-                        let path_buf = PathBuf::from(path);
+                if let Ok(path_str) = String::from_utf8(output.stdout) {
+                    let trimmed = path_str.trim();
+                    if !trimmed.is_empty() {
+                        let path_buf = PathBuf::from(trimmed);
                         debug!(path = %path_buf.display(), "Using piper from PATH");
                         return path_buf;
                     }
@@ -141,7 +140,7 @@ impl PiperTTSProvider {
             }
         }
 
-        // Check user installation
+        // Check user installation (XDG Base Directory standard: ~/.local/share/grars)
         if let Some(data_dir) = dirs::data_dir() {
             let user_model = data_dir.join("grars").join("models").join(model_name);
             if user_model.with_extension("onnx").exists() {

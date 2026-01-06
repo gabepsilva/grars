@@ -1,8 +1,7 @@
-//! Persistent configuration handling (mirrors the original grafl config).
+//! Persistent configuration handling for `grars`.
 //!
-//! Persists the selected voice provider and log level.
-//! The on-disk format is compatible with the original Python implementation:
-//! `~/.config/grafl/config.json` with fields like:
+//! Persists the selected voice provider and log level in a simple JSON file:
+//! `~/.config/grars/config.json` with fields like:
 //! `{ "voice_provider": "piper", "log_level": "INFO" }`.
 
 use std::fs;
@@ -14,7 +13,7 @@ use tracing::{debug, error, warn};
 
 use crate::model::{LogLevel, TTSBackend};
 
-const APP_CONFIG_DIR_NAME: &str = "grafl";
+const APP_CONFIG_DIR_NAME: &str = "grars";
 const CONFIG_FILE_NAME: &str = "config.json";
 
 #[derive(Debug)]
@@ -93,14 +92,9 @@ fn save_raw_config(mut cfg: RawConfig) -> Result<(), ConfigError> {
     };
 
     ensure_config_dir_exists(&path)?;
-    // Normalize by dropping unknown providers / empty strings if present.
-    if cfg.voice_provider.as_deref().is_none_or(|s| s.is_empty()) {
-        cfg.voice_provider = None;
-    }
-
-    if cfg.log_level.as_deref().is_none_or(|s| s.is_empty()) {
-        cfg.log_level = None;
-    }
+    // Normalize by dropping empty strings if present.
+    cfg.voice_provider = cfg.voice_provider.filter(|s| !s.is_empty());
+    cfg.log_level = cfg.log_level.filter(|s| !s.is_empty());
 
     let data = serde_json::to_string_pretty(&cfg)?;
     fs::write(&path, data)?;
@@ -177,21 +171,24 @@ pub fn load_log_level() -> LogLevel {
     }
 }
 
-/// Persist the selected voice provider to disk.
-///
-/// Errors are logged and otherwise ignored.
-pub fn save_voice_provider(backend: TTSBackend) {
-    debug!(?backend, "Saving voice provider");
-    let mut cfg = match load_raw_config() {
+/// Load config or return default on error.
+fn load_or_default_config() -> RawConfig {
+    match load_raw_config() {
         Ok(cfg) => cfg,
         Err(err) => {
             warn!(error = ?err, "Failed to load existing config, starting fresh");
             RawConfig::default()
         }
-    };
+    }
+}
 
+/// Persist the selected voice provider to disk.
+///
+/// Errors are logged and otherwise ignored.
+pub fn save_voice_provider(backend: TTSBackend) {
+    debug!(?backend, "Saving voice provider");
+    let mut cfg = load_or_default_config();
     cfg.voice_provider = Some(backend_to_str(backend).to_string());
-
     if let Err(err) = save_raw_config(cfg) {
         error!(error = ?err, "Failed to save config");
     }
@@ -202,16 +199,8 @@ pub fn save_voice_provider(backend: TTSBackend) {
 /// Errors are logged and otherwise ignored.
 pub fn save_log_level(level: LogLevel) {
     debug!(?level, "Saving log level");
-    let mut cfg = match load_raw_config() {
-        Ok(cfg) => cfg,
-        Err(err) => {
-            warn!(error = ?err, "Failed to load existing config, starting fresh");
-            RawConfig::default()
-        }
-    };
-
+    let mut cfg = load_or_default_config();
     cfg.log_level = Some(log_level_to_str(level).to_string());
-
     if let Err(err) = save_raw_config(cfg) {
         error!(error = ?err, "Failed to save config");
     }

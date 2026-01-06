@@ -1,6 +1,6 @@
 # grars Implementation Plan
 
-Rewriting grafl (Python GTK4 TTS app) in Rust with Iced.
+Rewriting the original Python GTK4 TTS app in Rust with Iced.
 
 ## Current State
 
@@ -161,11 +161,11 @@ dirs = "5.0"                # Config directory paths
 
 ---
 
-## Reference: grafl (Python) Sources
+## Reference: original Python sources
 
-- `src/grafl/providers/base.py` — TTSProvider interface
-- `src/grafl/providers/piper.py` — Piper implementation with sounddevice
-- `src/grafl/ui/window.py` — GTK4 UI, waveform animation, settings
-- `src/grafl/utils/config.py` — JSON config management
-- `src/grafl/utils/clipboard.py` — Clipboard/selection reading
+- `src/python_app/providers/base.py` — TTSProvider interface
+- `src/python_app/providers/piper.py` — Piper implementation with sounddevice
+- `src/python_app/ui/window.py` — GTK4 UI, waveform animation, settings
+- `src/python_app/utils/config.py` — JSON config management
+- `src/python_app/utils/clipboard.py` — Clipboard/selection reading
 
