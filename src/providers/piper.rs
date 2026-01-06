@@ -2,6 +2,7 @@
 //!
 //! Uses the Piper binary to synthesize speech from text and plays it using rodio.
 
+use std::env;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -131,19 +132,19 @@ impl PiperTTSProvider {
     fn find_model() -> PathBuf {
         let model_name = "en_US-lessac-medium";
 
+        // Check project models directory first (for development)
+        if let Ok(current_dir) = env::current_dir() {
+            let project_model = current_dir.join("models").join(model_name);
+            if project_model.with_extension("onnx").exists() {
+                return project_model;
+            }
+        }
+
         // Check user installation
         if let Some(data_dir) = dirs::data_dir() {
             let user_model = data_dir.join("grars").join("models").join(model_name);
             if user_model.with_extension("onnx").exists() {
                 return user_model;
-            }
-        }
-
-        // Check dad project (grafl) for development
-        if let Some(home) = dirs::home_dir() {
-            let grafl_model = home.join("git_projects").join("grafl").join(model_name);
-            if grafl_model.with_extension("onnx").exists() {
-                return grafl_model;
             }
         }
 
@@ -316,6 +317,12 @@ impl PiperTTSProvider {
             let mut state = self.state.lock().unwrap();
             state.position = position.min(state.audio_data.len());
             state.is_playing = false; // Stop current tracker thread
+        }
+
+        // Give the old tracker thread time to exit (it checks is_playing every 75ms)
+        // This prevents it from overwriting the position we just set
+        if was_playing {
+            thread::sleep(std::time::Duration::from_millis(80));
         }
 
         // Restart playback if we were playing

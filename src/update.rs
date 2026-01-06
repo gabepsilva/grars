@@ -14,6 +14,7 @@ pub fn update(app: &mut App, message: Message) -> Command<Message> {
         Message::SkipBackward => {
             if let Some(ref mut provider) = app.provider {
                 provider.skip_backward(SKIP_SECONDS);
+                // Position is updated synchronously in seek_to(), so progress is accurate immediately
                 app.progress = provider.get_progress();
             }
             Command::none()
@@ -22,12 +23,7 @@ pub fn update(app: &mut App, message: Message) -> Command<Message> {
             if let Some(ref mut provider) = app.provider {
                 provider.skip_forward(SKIP_SECONDS);
                 app.progress = provider.get_progress();
-
-                // Check if we've reached the end
-                if app.progress >= 1.0 {
-                    app.playback_state = PlaybackState::Stopped;
-                    return window::close(window::Id::MAIN);
-                }
+                // Don't close here - let Tick message handle it when playback actually finishes
             }
             Command::none()
         }

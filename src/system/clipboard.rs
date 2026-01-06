@@ -19,3 +19,4 @@ pub fn get_selected_text() -> Option<String> {
         .or_else(|| try_cmd("xclip", &["-selection", "primary", "-o"]))
 }
 
+

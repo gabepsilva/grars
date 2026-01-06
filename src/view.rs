@@ -80,25 +80,52 @@ pub fn view(app: &App) -> Element<'_, Message> {
     .align_items(Alignment::Center);
 
     let main_bar = row![
-        icon("assets/icons/volume.svg", 24.0),
+        icon("assets/icons/volume.svg", 32.0),
         Space::with_width(Length::Fixed(16.0)),
         waveform,
         Space::with_width(Length::Fixed(16.0)),
         controls,
-        Space::with_width(Length::Fixed(12.0)),
-        icon("assets/icons/settings.svg", 16.0),
     ]
-    .padding([8, 20, 4, 20])
+    .padding([8, 0, 4, 0])
     .align_items(Alignment::Center);
 
     let progress = container(
         progress_bar(0.0..=1.0, app.progress).height(Length::Fixed(2.0)),
     )
-    .padding([0, 27, 8, 49]);
+    .padding([8, 0, 8, 0]);
 
-    container(column![main_bar, progress])
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .style(iced::theme::Container::Custom(Box::new(WindowStyle)))
-        .into()
+    // Centered content (main controls + progress bar)
+    let centered_content = container(
+        column![
+            container(main_bar).padding([0, 10, 0, 10]),
+            container(progress).padding([0, 10, 0, 10]),
+        ]
+        .width(Length::Shrink)
+        .align_items(Alignment::Center),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .center_x()
+    .center_y();
+
+    // Settings icon (independent, top-right) - 32px total width with padding
+    let settings_icon = container(icon("assets/icons/settings.svg", 16.0)).padding(8);
+
+    // Layout: [spacer | centered_content | gear]
+    // Left spacer balances gear width so content is truly centered
+    container(
+        row![
+            Space::with_width(Length::Fixed(32.0)), // Balance for gear
+            centered_content,
+            container(settings_icon)
+                .width(Length::Fixed(32.0))
+                .height(Length::Fill)
+                .align_y(iced::alignment::Vertical::Top), // Gear at top
+        ]
+        .height(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .style(iced::theme::Container::Custom(Box::new(WindowStyle)))
+    .into()
 }
