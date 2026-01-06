@@ -1,6 +1,8 @@
 # grars
 
-A modern, lightweight Text-to-Speech (TTS) application written in Rust with Iced GUI. Reads selected any selected text in your computer and speaks it aloud with a beautiful floating window interface.
+**Graphical Reader Assistant (Rust)**
+
+A modern, lightweight Text-to-Speech (TTS) application written in Rust with Iced GUI. Reads any selected text in your computer and speaks it aloud with a beautiful floating window interface.
 
 ## Features
 

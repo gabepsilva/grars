@@ -58,9 +58,10 @@ VENV_DIR="$INSTALL_DIR/venv"
 MODELS_DIR="$INSTALL_DIR/models"
 GRARS_BIN="$BIN_DIR/grars"
 
-# GitHub repository (update with actual repo)
-GITHUB_REPO="${GITHUB_REPO:-USER/grars}"
+# GitHub repository
+GITHUB_REPO="${GITHUB_REPO:-gabepsilva/grars}"
 GITHUB_API="https://api.github.com/repos/$GITHUB_REPO"
+VERSION="${VERSION:-1.0.0}"
 
 log_info "Installing to: $INSTALL_DIR"
 log_info "Binary will be installed to: $BIN_DIR"
@@ -470,6 +471,25 @@ download_model() {
     return 1
 }
 
+# Detect system OS
+detect_os() {
+    local os
+    os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    case "$os" in
+        linux)
+            OS="linux"
+            ;;
+        darwin)
+            OS="macos"
+            ;;
+        *)
+            OS="linux"  # Default fallback
+            log_warn "Unknown OS $os, defaulting to linux"
+            ;;
+    esac
+    log_info "Detected OS: $OS"
+}
+
 # Detect system architecture
 detect_arch() {
     local arch
@@ -519,9 +539,16 @@ download_and_install_binary() {
     # Ensure bin directory exists
     mkdir -p "$BIN_DIR"
     
-    # Construct download URL
-    BINARY_NAME="grars-${ARCH}-unknown-linux-gnu"
-    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$LATEST_RELEASE/$BINARY_NAME"
+    # Detect OS and architecture
+    detect_os
+    detect_arch
+    
+    # Construct binary name: grars-1.0.0-linux-x86_64
+    BINARY_NAME="grars-${VERSION}-${OS}-${ARCH}"
+    
+    # Use specific release tag for v1.0.0, or allow override via RELEASE_TAG env var
+    RELEASE_TAG="${RELEASE_TAG:-untagged-990b5f64375a7204b469}"
+    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$RELEASE_TAG/$BINARY_NAME"
     
     log_info "Download URL: $DOWNLOAD_URL"
     
@@ -586,8 +613,6 @@ install_binary() {
     
     # No local binary found, try downloading from GitHub
     log_info "No local binary found. Attempting to download from GitHub..."
-    detect_arch
-    get_latest_release
     if download_and_install_binary; then
         return 0
     fi
