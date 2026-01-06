@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 iced = { version = "0.12", features = ["svg", "tokio"] }
 thiserror = "2.0"
+rodio = "0.19"          # Audio playback
+rustfft = "6.2"         # FFT for visualization
+dirs = "5.0"            # Config directory paths

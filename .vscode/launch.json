@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        // Debug grars (F5 default) — Use for normal debugging.
+        // Variables, stack traces, and stepping work as expected.
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug grars",
+            "cargo": {
+                "args": ["build", "--bin=grars", "--package=grars"],
+                "filter": {
+                    "name": "grars",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        // Debug grars (release) — Use when debugging performance issues or bugs
+        // that only appear in release builds. Note: the optimizer may inline
+        // functions and eliminate variables, making debugging harder.
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug grars (release)",
+            "cargo": {
+                "args": ["build", "--release", "--bin=grars", "--package=grars"],
+                "filter": {
+                    "name": "grars",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
+
