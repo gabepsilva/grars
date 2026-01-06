@@ -10,6 +10,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use dirs::config_dir;
+use tracing::{debug, error, warn};
 
 use crate::model::{LogLevel, TTSBackend};
 
@@ -20,6 +21,15 @@ const CONFIG_FILE_NAME: &str = "config.json";
 pub enum ConfigError {
     Io(io::Error),
     Json(serde_json::Error),
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(err) => write!(f, "IO error: {err}"),
+            Self::Json(err) => write!(f, "JSON error: {err}"),
+        }
+    }
 }
 
 impl From<io::Error> for ConfigError {
@@ -60,41 +70,41 @@ fn ensure_config_dir_exists(path: &Path) -> io::Result<()> {
 fn load_raw_config() -> Result<RawConfig, ConfigError> {
     let Some(path) = config_path() else {
         // No config directory available on this platform; treat as empty config.
-        eprintln!("Config: no config_dir available, using defaults only");
+        debug!("No config_dir available, using defaults only");
         return Ok(RawConfig::default());
     };
 
     if !path.exists() {
-        eprintln!("Config: file does not exist, using defaults ({path:?})");
+        debug!(?path, "Config file does not exist, using defaults");
         return Ok(RawConfig::default());
     }
 
     let data = fs::read_to_string(&path)?;
     let cfg = serde_json::from_str(&data)?;
-    eprintln!("Config: loaded from {path:?}");
+    debug!(?path, "Config loaded");
     Ok(cfg)
 }
 
 fn save_raw_config(mut cfg: RawConfig) -> Result<(), ConfigError> {
     let Some(path) = config_path() else {
         // Nothing we can do; silently ignore.
-        eprintln!("Config: no config_dir available, skipping save");
+        warn!("No config_dir available, skipping save");
         return Ok(());
     };
 
     ensure_config_dir_exists(&path)?;
     // Normalize by dropping unknown providers / empty strings if present.
-    if cfg.voice_provider.as_deref().map_or(true, |s| s.is_empty()) {
+    if cfg.voice_provider.as_deref().is_none_or(|s| s.is_empty()) {
         cfg.voice_provider = None;
     }
 
-    if cfg.log_level.as_deref().map_or(true, |s| s.is_empty()) {
+    if cfg.log_level.as_deref().is_none_or(|s| s.is_empty()) {
         cfg.log_level = None;
     }
 
     let data = serde_json::to_string_pretty(&cfg)?;
     fs::write(&path, data)?;
-    eprintln!("Config: saved to {path:?}");
+    debug!(?path, "Config saved");
     Ok(())
 }
 
@@ -143,11 +153,11 @@ pub fn load_voice_provider() -> TTSBackend {
             .and_then(backend_from_str)
             .unwrap_or(TTSBackend::Piper),
         Err(err) => {
-            eprintln!("Config: failed to load config, using default backend: {err:?}");
+            warn!(error = ?err, "Failed to load config, using default backend");
             TTSBackend::Piper
         }
     };
-    eprintln!("Config: effective voice provider on load = {:?}", backend);
+    debug!(?backend, "Loaded voice provider");
     backend
 }
 
@@ -160,6 +170,7 @@ pub fn load_log_level() -> LogLevel {
             .and_then(log_level_from_str)
             .unwrap_or(LogLevel::Info),
         Err(err) => {
+            // Note: we can't use tracing here as logging may not be initialized yet
             eprintln!("Config: failed to load config, using default log level: {err:?}");
             LogLevel::Info
         }
@@ -168,13 +179,13 @@ pub fn load_log_level() -> LogLevel {
 
 /// Persist the selected voice provider to disk.
 ///
-/// Errors are logged to stderr and otherwise ignored.
+/// Errors are logged and otherwise ignored.
 pub fn save_voice_provider(backend: TTSBackend) {
-    eprintln!("Config: saving voice provider = {:?}", backend);
+    debug!(?backend, "Saving voice provider");
     let mut cfg = match load_raw_config() {
         Ok(cfg) => cfg,
         Err(err) => {
-            eprintln!("Config: failed to load existing config, starting fresh: {err:?}");
+            warn!(error = ?err, "Failed to load existing config, starting fresh");
             RawConfig::default()
         }
     };
@@ -182,19 +193,19 @@ pub fn save_voice_provider(backend: TTSBackend) {
     cfg.voice_provider = Some(backend_to_str(backend).to_string());
 
     if let Err(err) = save_raw_config(cfg) {
-        eprintln!("Failed to save config: {err:?}");
+        error!(error = ?err, "Failed to save config");
     }
 }
 
 /// Persist the selected log level to disk.
 ///
-/// Errors are logged to stderr and otherwise ignored.
+/// Errors are logged and otherwise ignored.
 pub fn save_log_level(level: LogLevel) {
-    eprintln!("Config: saving log level = {:?}", level);
+    debug!(?level, "Saving log level");
     let mut cfg = match load_raw_config() {
         Ok(cfg) => cfg,
         Err(err) => {
-            eprintln!("Config: failed to load existing config, starting fresh: {err:?}");
+            warn!(error = ?err, "Failed to load existing config, starting fresh");
             RawConfig::default()
         }
     };
@@ -202,7 +213,7 @@ pub fn save_log_level(level: LogLevel) {
     cfg.log_level = Some(log_level_to_str(level).to_string());
 
     if let Err(err) = save_raw_config(cfg) {
-        eprintln!("Failed to save config: {err:?}");
+        error!(error = ?err, "Failed to save config");
     }
 }
 

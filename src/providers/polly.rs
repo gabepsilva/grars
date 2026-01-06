@@ -6,6 +6,7 @@ use std::path::Path;
 
 use aws_config::BehaviorVersion;
 use aws_sdk_polly::types::{Engine, OutputFormat, VoiceId};
+use tracing::{debug, info};
 
 use super::audio_player::AudioPlayer;
 use super::{TTSError, TTSProvider};
@@ -27,7 +28,7 @@ impl PollyTTSProvider {
     ///
     /// Loads credentials from `~/.aws/credentials` or environment variables.
     pub fn new() -> Result<Self, TTSError> {
-        eprintln!("PollyTTSProvider: Initializing...");
+        info!("Initializing AWS Polly TTS provider");
 
         // Create a tokio runtime for async AWS SDK calls
         let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -37,7 +38,7 @@ impl PollyTTSProvider {
 
         // Determine region: check ~/.aws/config, env vars, or default to us-east-1
         let region = Self::detect_region();
-        eprintln!("PollyTTSProvider: Using region: {}", region);
+        debug!(region = %region, "Using AWS region");
 
         // Load AWS config (credentials from ~/.aws/credentials or env vars)
         let config = runtime.block_on(async {
@@ -48,7 +49,7 @@ impl PollyTTSProvider {
         });
 
         let client = aws_sdk_polly::Client::new(&config);
-        eprintln!("PollyTTSProvider: AWS client created");
+        debug!("AWS Polly client created");
 
         // Polly neural voices use 16kHz sample rate
         let player = AudioPlayer::new(16000)?;
@@ -148,7 +149,7 @@ impl PollyTTSProvider {
 
 impl TTSProvider for PollyTTSProvider {
     fn speak(&mut self, text: &str) -> Result<(), TTSError> {
-        eprintln!("PollyTTSProvider: Speaking {} chars", text.len());
+        debug!(chars = text.len(), "Polly: synthesizing speech");
 
         // Stop any current playback
         self.player.stop()?;
@@ -182,15 +183,14 @@ impl TTSProvider for PollyTTSProvider {
             ));
         }
 
-        eprintln!(
-            "PollyTTSProvider: Received {} bytes of audio",
-            audio_bytes.len()
-        );
-
         // Convert PCM to f32 and play
         let audio_data = AudioPlayer::pcm_to_f32(&audio_bytes);
         let duration_sec = audio_data.len() as f32 / 16000.0;
-        eprintln!("PollyTTSProvider: Audio duration {:.1}s", duration_sec);
+        info!(
+            bytes = audio_bytes.len(),
+            duration_sec = format!("{:.1}", duration_sec),
+            "Polly: audio received"
+        );
 
         self.player.play_audio(audio_data)
     }

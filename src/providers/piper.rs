@@ -6,6 +6,8 @@ use std::env;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+use tracing::{debug, info};
+
 use super::audio_player::AudioPlayer;
 use super::{TTSError, TTSProvider};
 
@@ -40,6 +42,9 @@ impl PiperTTSProvider {
     ) -> Result<Self, TTSError> {
         let piper_bin = piper_bin.unwrap_or_else(Self::find_piper_binary);
         let model_path = model_path.unwrap_or_else(Self::find_model);
+
+        info!("Initializing Piper TTS provider");
+        debug!(?piper_bin, ?model_path, "Piper configuration");
 
         // Piper uses 22050 Hz sample rate
         let player = AudioPlayer::new(22050)?;
@@ -126,6 +131,8 @@ impl PiperTTSProvider {
 
 impl TTSProvider for PiperTTSProvider {
     fn speak(&mut self, text: &str) -> Result<(), TTSError> {
+        debug!(chars = text.len(), "Piper: synthesizing speech");
+
         // Stop any current playback
         self.player.stop()?;
 
@@ -177,6 +184,13 @@ impl TTSProvider for PiperTTSProvider {
 
         // Convert PCM to f32 and play
         let audio_data = AudioPlayer::pcm_to_f32(&output.stdout);
+        let duration_sec = audio_data.len() as f32 / 22050.0;
+        info!(
+            bytes = output.stdout.len(),
+            duration_sec = format!("{:.1}", duration_sec),
+            "Piper: audio generated"
+        );
+
         self.player.play_audio(audio_data)
     }
 

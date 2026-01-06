@@ -1,10 +1,12 @@
 //! Business logic for state transitions
 
 use iced::window;
-use iced::{Task, Size};
+use iced::{Size, Task};
+use tracing::{debug, error, info};
 
-use crate::model::{App, Message, PlaybackState, TTSBackend};
 use crate::config;
+use crate::logging;
+use crate::model::{App, Message, PlaybackState, TTSBackend};
 use crate::providers::{PiperTTSProvider, PollyTTSProvider, TTSProvider};
 
 const SKIP_SECONDS: f32 = 5.0;
@@ -66,7 +68,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::Settings => {
-            eprintln!("Settings clicked");
+            debug!("Settings clicked");
             let (window_id, task) = window::open(window::Settings {
                 size: Size::new(760.0, 280.0),
                 resizable: false,
@@ -76,7 +78,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 position: window::Position::Centered,
                 ..Default::default()
             });
-            eprintln!("Opening settings window with ID: {:?}", window_id);
+            debug!(?window_id, "Opening settings window");
             app.settings_window_id = Some(window_id);
             app.show_settings_modal = true;
             task.map(Message::WindowOpened)
@@ -90,30 +92,32 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             }
         }
         Message::ProviderSelected(backend) => {
-            eprintln!("UI: provider selected = {:?}", backend);
+            info!(?backend, "TTS provider selected");
             app.selected_backend = backend;
             // Persist the selected backend so future runs remember the choice.
             config::save_voice_provider(backend);
             Task::none()
         }
         Message::LogLevelSelected(level) => {
-            eprintln!("UI: log level selected = {:?}", level);
+            info!(?level, "Log level selected");
             app.log_level = level;
             // Persist the selected log level so future runs remember the choice.
             config::save_log_level(level);
+            // Update runtime log level
+            logging::set_verbosity(level);
             Task::none()
         }
         Message::WindowOpened(id) => {
-            eprintln!("Window opened: {:?}", id);
+            debug!(?id, "Window opened");
             if app.main_window_id.is_none() {
                 app.main_window_id = Some(id);
-                
+
                 // Initialize TTS provider and start speaking now that window is visible
                 if let Some(text) = app.pending_text.take() {
-                    eprintln!(
-                        "Initializing {:?} TTS for {} bytes",
-                        app.selected_backend,
-                        text.len()
+                    info!(
+                        backend = ?app.selected_backend,
+                        bytes = text.len(),
+                        "Initializing TTS provider"
                     );
 
                     let provider_result: Result<Box<dyn TTSProvider>, _> =
@@ -129,14 +133,15 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                     match provider_result {
                         Ok(mut provider) => {
                             if let Err(e) = provider.speak(&text) {
-                                eprintln!("TTS error: {e}");
+                                error!(error = %e, "TTS speak failed");
                             } else {
+                                info!("TTS playback started");
                                 app.provider = Some(provider);
                                 app.playback_state = PlaybackState::Playing;
                             }
                         }
                         Err(e) => {
-                            eprintln!("Failed to initialize TTS: {e}");
+                            error!(error = %e, "Failed to initialize TTS provider");
                         }
                     }
                 }
@@ -145,7 +150,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::WindowClosed(id) => {
-            eprintln!("Window closed: {:?}", id);
+            debug!(?id, "Window closed");
             if app.settings_window_id == Some(id) {
                 app.settings_window_id = None;
                 app.show_settings_modal = false;
