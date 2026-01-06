@@ -17,12 +17,6 @@ pub enum TTSError {
 
     #[error("Audio playback error: {0}")]
     AudioError(String),
-
-    #[error("Provider not configured: {0}")]
-    ConfigError(String),
-
-    #[error("Operation not supported: {0}")]
-    NotSupported(String),
 }
 
 /// Abstract interface for TTS providers.
@@ -63,10 +57,4 @@ pub trait TTSProvider {
     ///
     /// Returns normalized amplitude values (0.0-1.0) for each frequency band.
     fn get_frequency_bands(&self, num_bands: usize) -> Vec<f32>;
-
-    /// Return the name of this TTS provider.
-    fn name(&self) -> &str;
-
-    /// Validate that the provider is properly configured and available.
-    fn validate_config(&self) -> bool;
 }

@@ -166,24 +166,33 @@ impl PiperTTSProvider {
             .collect()
     }
 
-    /// Start audio playback from internal audio data.
+    /// Start audio playback from current position.
     fn start_playback(&mut self) -> Result<(), TTSError> {
+        // Stop any existing playback first
+        if let Some(sink) = self.sink.take() {
+            sink.stop();
+        }
+
         let stream_handle = self
             .stream_handle
             .as_ref()
             .ok_or_else(|| TTSError::AudioError("No audio output available".into()))?;
 
-        // Get audio data from state
-        let audio_data = {
+        // Get audio data from current position
+        let (audio_slice, position) = {
             let state = self.state.lock().unwrap();
             if state.audio_data.is_empty() {
                 return Err(TTSError::AudioError("No audio data to play".into()));
             }
-            state.audio_data.clone()
+            let pos = state.position.min(state.audio_data.len());
+            if pos >= state.audio_data.len() {
+                return Err(TTSError::AudioError("Playback position at end".into()));
+            }
+            (state.audio_data[pos..].to_vec(), pos)
         };
 
         // Convert f32 samples back to i16 for WAV encoding
-        let samples_i16: Vec<i16> = audio_data
+        let samples_i16: Vec<i16> = audio_slice
             .iter()
             .map(|&s| (s * 32767.0).clamp(-32768.0, 32767.0) as i16)
             .collect();
@@ -210,7 +219,7 @@ impl PiperTTSProvider {
         }
 
         // Start position tracking in a background thread
-        self.start_position_tracker();
+        self.start_position_tracker_from(position);
 
         Ok(())
     }
@@ -249,7 +258,7 @@ impl PiperTTSProvider {
     }
 
     /// Start a background thread to track playback position.
-    fn start_position_tracker(&self) {
+    fn start_position_tracker_from(&self, start_position: usize) {
         let state = Arc::clone(&self.state);
         let sample_rate = self.sample_rate;
 
@@ -257,12 +266,23 @@ impl PiperTTSProvider {
             let chunk_duration_ms = 75; // Match UI update rate
             let samples_per_chunk = (sample_rate as usize * chunk_duration_ms) / 1000;
 
+            // Initialize position to start position
+            {
+                let mut state_guard = state.lock().unwrap();
+                state_guard.position = start_position;
+            }
+
             loop {
                 thread::sleep(std::time::Duration::from_millis(chunk_duration_ms as u64));
 
                 let mut state_guard = state.lock().unwrap();
 
-                if !state_guard.is_playing || state_guard.is_paused {
+                // Exit thread if not playing (stopped or position changed externally)
+                if !state_guard.is_playing {
+                    break;
+                }
+
+                if state_guard.is_paused {
                     continue;
                 }
 
@@ -282,6 +302,28 @@ impl PiperTTSProvider {
                 state_guard.current_chunk = state_guard.audio_data[start..end].to_vec();
             }
         });
+    }
+
+    /// Seek to a new position and restart playback.
+    fn seek_to(&mut self, position: usize) -> Result<(), TTSError> {
+        let was_playing = {
+            let state = self.state.lock().unwrap();
+            state.is_playing && !state.is_paused
+        };
+
+        // Update position in state
+        {
+            let mut state = self.state.lock().unwrap();
+            state.position = position.min(state.audio_data.len());
+            state.is_playing = false; // Stop current tracker thread
+        }
+
+        // Restart playback if we were playing
+        if was_playing {
+            self.start_playback()?;
+        }
+
+        Ok(())
     }
 }
 
@@ -396,21 +438,20 @@ impl TTSProvider for PiperTTSProvider {
 
     fn skip_forward(&mut self, seconds: f32) {
         let samples_to_skip = (seconds * self.sample_rate as f32) as usize;
-        let mut state = self.state.lock().unwrap();
-        let new_position = state.position + samples_to_skip;
-        state.position = new_position.min(state.audio_data.len());
-
-        // If we've reached the end, stop playback
-        if state.position >= state.audio_data.len() {
-            state.is_playing = false;
-            state.is_paused = false;
-        }
+        let new_position = {
+            let state = self.state.lock().unwrap();
+            (state.position + samples_to_skip).min(state.audio_data.len())
+        };
+        self.seek_to(new_position).ok();
     }
 
     fn skip_backward(&mut self, seconds: f32) {
         let samples_to_skip = (seconds * self.sample_rate as f32) as usize;
-        let mut state = self.state.lock().unwrap();
-        state.position = state.position.saturating_sub(samples_to_skip);
+        let new_position = {
+            let state = self.state.lock().unwrap();
+            state.position.saturating_sub(samples_to_skip)
+        };
+        self.seek_to(new_position).ok();
     }
 
     fn get_progress(&self) -> f32 {
@@ -489,12 +530,5 @@ impl TTSProvider for PiperTTSProvider {
         bands
     }
 
-    fn name(&self) -> &str {
-        "Piper TTS"
-    }
-
-    fn validate_config(&self) -> bool {
-        self.piper_bin.exists() && self.model_path.with_extension("onnx").exists()
-    }
 }
 

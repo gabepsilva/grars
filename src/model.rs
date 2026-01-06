@@ -1,6 +1,8 @@
-/// Domain model for the application state
+//! Domain model for the application state
 
-#[derive(Debug, Clone, PartialEq)]
+use crate::providers::PiperTTSProvider;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PlaybackState {
     Stopped,
     Playing,
@@ -16,20 +18,27 @@ pub enum Message {
     Tick,
 }
 
-#[derive(Debug, Clone)]
+/// Application state.
+///
+/// Note: Does not derive `Clone` because `PiperTTSProvider` contains
+/// audio resources that cannot be cloned.
 pub struct App {
     pub playback_state: PlaybackState,
     pub progress: f32,
-    pub wave_offset: u32,
+    pub frequency_bands: Vec<f32>,
+    pub provider: Option<PiperTTSProvider>,
 }
 
 impl App {
-    pub fn new() -> Self {
+    /// Create a new app with the given TTS provider.
+    pub fn new(provider: Option<PiperTTSProvider>) -> Self {
         Self {
-            playback_state: PlaybackState::Playing,
-            progress: 0.35,
-            wave_offset: 0,
+            playback_state: provider
+                .as_ref()
+                .map_or(PlaybackState::Stopped, |_| PlaybackState::Playing),
+            progress: 0.0,
+            frequency_bands: vec![0.0; 10],
+            provider,
         }
     }
 }
-

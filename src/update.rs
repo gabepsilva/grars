@@ -1,29 +1,81 @@
-/// Business logic for state transitions
+//! Business logic for state transitions
+
+use iced::window;
+use iced::Command;
 
 use crate::model::{App, Message, PlaybackState};
+use crate::providers::TTSProvider;
 
-pub fn update(app: &mut App, message: Message) {
+const SKIP_SECONDS: f32 = 5.0;
+const NUM_BANDS: usize = 10;
+
+pub fn update(app: &mut App, message: Message) -> Command<Message> {
     match message {
         Message::SkipBackward => {
-            app.progress = (app.progress - 0.1).max(0.0);
+            if let Some(ref mut provider) = app.provider {
+                provider.skip_backward(SKIP_SECONDS);
+                app.progress = provider.get_progress();
+            }
+            Command::none()
         }
         Message::SkipForward => {
-            app.progress = (app.progress + 0.1).min(1.0);
+            if let Some(ref mut provider) = app.provider {
+                provider.skip_forward(SKIP_SECONDS);
+                app.progress = provider.get_progress();
+
+                // Check if we've reached the end
+                if app.progress >= 1.0 {
+                    app.playback_state = PlaybackState::Stopped;
+                    return window::close(window::Id::MAIN);
+                }
+            }
+            Command::none()
         }
         Message::PlayPause => {
-            app.playback_state = match app.playback_state {
-                PlaybackState::Playing => PlaybackState::Paused,
-                _ => PlaybackState::Playing,
-            };
+            if let Some(ref mut provider) = app.provider {
+                match app.playback_state {
+                    PlaybackState::Playing => {
+                        if provider.pause().is_ok() {
+                            app.playback_state = PlaybackState::Paused;
+                        }
+                    }
+                    PlaybackState::Paused => {
+                        if provider.resume().is_ok() {
+                            app.playback_state = PlaybackState::Playing;
+                        }
+                    }
+                    PlaybackState::Stopped => {
+                        // Can't resume from stopped - would need to re-speak
+                    }
+                }
+            }
+            Command::none()
         }
         Message::Stop => {
+            if let Some(ref mut provider) = app.provider {
+                provider.stop().ok();
+            }
             app.playback_state = PlaybackState::Stopped;
             app.progress = 0.0;
+            app.frequency_bands = vec![0.0; NUM_BANDS];
+            // Close window when stopped
+            window::close(window::Id::MAIN)
         }
         Message::Tick => {
-            // Advance wave animation offset (wraps at 100)
-            app.wave_offset = (app.wave_offset + 1) % 100;
+            if let Some(ref provider) = app.provider {
+                // Update progress from provider
+                app.progress = provider.get_progress();
+
+                // Update frequency bands for visualization
+                app.frequency_bands = provider.get_frequency_bands(NUM_BANDS);
+
+                // Check if playback finished
+                if !provider.is_playing() && !provider.is_paused() {
+                    app.playback_state = PlaybackState::Stopped;
+                    return window::close(window::Id::MAIN);
+                }
+            }
+            Command::none()
         }
     }
 }
-

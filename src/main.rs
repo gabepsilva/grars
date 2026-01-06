@@ -1,4 +1,4 @@
-/// Entry point and window configuration
+//! Entry point and window configuration
 
 mod app;
 mod model;
@@ -10,6 +10,7 @@ mod view;
 
 use iced::{Application, Settings, Size};
 
+use crate::app::AppFlags;
 use crate::model::App;
 use crate::providers::{PiperTTSProvider, TTSProvider};
 
@@ -23,25 +24,25 @@ fn main() -> iced::Result {
         eprintln!("No text selected");
     }
 
-    // Initialize TTS provider and speak selected text
-    if let Some(text) = selected_text {
+    // Initialize TTS provider and start speaking
+    let provider = selected_text.and_then(|text| {
         match PiperTTSProvider::new() {
             Ok(mut provider) => {
-                eprintln!("Piper TTS initialized, speaking...");
                 if let Err(e) = provider.speak(&text) {
                     eprintln!("TTS error: {e}");
+                    return None;
                 }
-                // Keep provider alive by leaking it (temporary for testing)
-                // The audio will play in the background
-                Box::leak(Box::new(provider));
+                Some(provider)
             }
             Err(e) => {
                 eprintln!("Failed to initialize Piper TTS: {e}");
+                None
             }
         }
-    }
+    });
 
     App::run(Settings {
+        flags: AppFlags { provider },
         window: iced::window::Settings {
             size: Size::new(380.0, 70.0),
             resizable: false,
