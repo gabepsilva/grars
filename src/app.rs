@@ -4,6 +4,7 @@ use iced::time::{self, Duration};
 use iced::{Element, Subscription, Task};
 use iced::window;
 use std::cell::RefCell;
+use tracing::info;
 
 use crate::model::{App, Message, PlaybackState};
 use crate::update;
@@ -19,7 +20,29 @@ pub fn set_initial_text(text: Option<String>) {
 
 pub fn new() -> (App, Task<Message>) {
     let text = INITIAL_TEXT.with(|t| t.borrow_mut().take());
-    (App::new(text), Task::none())
+    let app = App::new(text);
+    
+    // Log initial state for debugging
+    if let Some(ref pending) = app.pending_text {
+        info!(bytes = pending.len(), "App created with pending text");
+    } else {
+        info!("App created with no pending text");
+    }
+    
+    // Send a delayed message to initialize TTS if WindowOpened event didn't fire
+    // This is a fallback for cases where the initial window doesn't trigger the event
+    let init_task = if app.pending_text.is_some() {
+        Task::perform(
+            async {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            },
+            |_| Message::InitIfReady,
+        )
+    } else {
+        Task::none()
+    };
+    
+    (app, init_task)
 }
 
 pub fn title(app: &App) -> String {

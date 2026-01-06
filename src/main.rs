@@ -11,7 +11,7 @@ mod update;
 mod view;
 
 use iced::{application, Size};
-use tracing::{debug, info};
+use tracing::info;
 
 fn main() -> iced::Result {
     // Initialize logging first (before anything else)
@@ -33,9 +33,9 @@ fn main() -> iced::Result {
     let selected_text = crate::system::get_selected_text();
 
     if let Some(ref text) = selected_text {
-        info!(bytes = text.len(), "Text selected");
+        info!(bytes = text.len(), preview = %text.chars().take(50).collect::<String>(), "Text selected at startup");
     } else {
-        debug!("No text selected");
+        info!("No text selected at startup - app will wait for text or close");
     }
 
     // Store selected text for later initialization after window appears

@@ -12,6 +12,44 @@ use crate::providers::{PiperTTSProvider, PollyTTSProvider, TTSProvider};
 const SKIP_SECONDS: f32 = 5.0;
 const NUM_BANDS: usize = 10;
 
+/// Initialize TTS provider and start speaking with the given text.
+/// Returns true if initialization was successful, false otherwise.
+fn initialize_tts(app: &mut App, text: String, context: &str) -> bool {
+    info!(
+        context,
+        backend = ?app.selected_backend,
+        bytes = text.len(),
+        "Initializing TTS provider with text"
+    );
+
+    let provider_result: Result<Box<dyn TTSProvider>, _> = match app.selected_backend {
+        TTSBackend::Piper => {
+            PiperTTSProvider::new().map(|p| Box::new(p) as Box<dyn TTSProvider>)
+        }
+        TTSBackend::AwsPolly => {
+            PollyTTSProvider::new().map(|p| Box::new(p) as Box<dyn TTSProvider>)
+        }
+    };
+
+    match provider_result {
+        Ok(mut provider) => {
+            if let Err(e) = provider.speak(&text) {
+                error!(error = %e, "TTS speak failed");
+                false
+            } else {
+                info!(context, "TTS playback started successfully");
+                app.provider = Some(provider);
+                app.playback_state = PlaybackState::Playing;
+                true
+            }
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to initialize TTS provider");
+            false
+        }
+    }
+}
+
 pub fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::SkipBackward => {
@@ -136,43 +174,19 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::WindowOpened(id) => {
-            debug!(?id, "Window opened");
+            info!(?id, "Window opened event received");
             if app.main_window_id.is_none() {
                 app.main_window_id = Some(id);
+                info!("Main window ID set, initializing TTS");
 
                 // Initialize TTS provider and start speaking now that window is visible
                 if let Some(text) = app.pending_text.take() {
-                    info!(
-                        backend = ?app.selected_backend,
-                        bytes = text.len(),
-                        "Initializing TTS provider"
-                    );
-
-                    let provider_result: Result<Box<dyn TTSProvider>, _> =
-                        match app.selected_backend {
-                            TTSBackend::Piper => {
-                                PiperTTSProvider::new().map(|p| Box::new(p) as Box<dyn TTSProvider>)
-                            }
-                            TTSBackend::AwsPolly => {
-                                PollyTTSProvider::new().map(|p| Box::new(p) as Box<dyn TTSProvider>)
-                            }
-                        };
-
-                    match provider_result {
-                        Ok(mut provider) => {
-                            if let Err(e) = provider.speak(&text) {
-                                error!(error = %e, "TTS speak failed");
-                            } else {
-                                info!("TTS playback started");
-                                app.provider = Some(provider);
-                                app.playback_state = PlaybackState::Playing;
-                            }
-                        }
-                        Err(e) => {
-                            error!(error = %e, "Failed to initialize TTS provider");
-                        }
-                    }
+                    initialize_tts(app, text, "WindowOpened");
+                } else {
+                    warn!("Window opened but no pending text to speak");
                 }
+            } else {
+                debug!(?id, "Window opened but main window ID already set");
             }
             app.current_window_id = Some(id);
             Task::none()
@@ -185,6 +199,21 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             }
             if app.current_window_id == Some(id) {
                 app.current_window_id = None;
+            }
+            Task::none()
+        }
+        Message::InitIfReady => {
+            // Fallback: initialize TTS if window is ready but WindowOpened didn't fire
+            // Only initialize if we haven't already and we have pending text
+            if app.main_window_id.is_none() {
+                if let Some(text) = app.pending_text.take() {
+                    info!("Fallback: Initializing TTS (WindowOpened event may have been missed)");
+                    initialize_tts(app, text, "Fallback");
+                } else {
+                    trace!("Fallback: No pending text to initialize");
+                }
+            } else {
+                trace!("Fallback: Already initialized");
             }
             Task::none()
         }

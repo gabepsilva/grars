@@ -39,6 +39,7 @@ pub enum Message {
     LogLevelSelected(LogLevel),
     WindowOpened(window::Id),
     WindowClosed(window::Id),
+    InitIfReady, // Fallback: initialize TTS if window is ready but event didn't fire
 }
 
 /// Application state.

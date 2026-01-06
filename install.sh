@@ -7,7 +7,7 @@
 #
 # This script will:
 #   1. Detect your Linux distribution
-#   2. Install system dependencies (espeak-ng, Python3, venv)
+#   2. Install system dependencies (espeak-ng, Python3, venv, wl-clipboard/xclip)
 #   3. Install grars binary (tries local build first, then downloads from GitHub)
 #   4. Install grars to ~/.local/bin
 #   5. Set up piper-tts dependencies (venv, piper-tts package, voice models)
@@ -110,6 +110,27 @@ check_and_install_dependencies() {
         log_success "espeak-ng found"
     fi
     
+    # Check clipboard utilities (need at least one for Wayland or X11)
+    local clipboard_available=false
+    if command_exists wl-paste; then
+        log_success "wl-paste found (Wayland clipboard support)"
+        clipboard_available=true
+    else
+        log_warn "wl-paste not found (Wayland clipboard support missing)"
+    fi
+    
+    if command_exists xclip; then
+        log_success "xclip found (X11 clipboard support)"
+        clipboard_available=true
+    else
+        log_warn "xclip not found (X11 clipboard support missing)"
+    fi
+    
+    if [ "$clipboard_available" = false ]; then
+        missing_deps+=("clipboard-utils")
+        log_warn "No clipboard utility found (need wl-clipboard for Wayland or xclip for X11)"
+    fi
+    
     # Check Python3
     local python_missing=false
     local venv_missing=false
@@ -168,6 +189,7 @@ check_and_install_dependencies() {
             if command_exists pacman; then
                 [ "$python_missing" = true ] && packages_to_install+=("python" "python-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
+                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via pacman: ${packages_to_install[*]}"
                     sudo pacman -S --needed --noconfirm "${packages_to_install[@]}"
@@ -182,6 +204,7 @@ check_and_install_dependencies() {
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-venv" "python3-pip")
                 [ "$venv_missing" = true ] && packages_to_install+=("python3-venv")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
+                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 # Remove duplicates
                 IFS=" " read -r -a packages_to_install <<< "$(printf '%s\n' "${packages_to_install[@]}" | sort -u | tr '\n' ' ')"
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
@@ -198,6 +221,7 @@ check_and_install_dependencies() {
             if command_exists dnf; then
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
+                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via dnf: ${packages_to_install[*]}"
                     sudo dnf install -y "${packages_to_install[@]}"
@@ -205,6 +229,7 @@ check_and_install_dependencies() {
             elif command_exists yum; then
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
+                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via yum: ${packages_to_install[*]}"
                     sudo yum install -y "${packages_to_install[@]}"
@@ -218,6 +243,7 @@ check_and_install_dependencies() {
             if command_exists zypper; then
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
+                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via zypper: ${packages_to_install[*]}"
                     sudo zypper install -y "${packages_to_install[@]}"
@@ -231,6 +257,7 @@ check_and_install_dependencies() {
             if command_exists apk; then
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "py3-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
+                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via apk: ${packages_to_install[*]}"
                     sudo apk add --no-cache "${packages_to_install[@]}"
@@ -244,6 +271,7 @@ check_and_install_dependencies() {
             if command_exists xbps-install; then
                 [ "$python_missing" = true ] && packages_to_install+=("python3")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
+                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via xbps-install: ${packages_to_install[*]}"
                     sudo xbps-install -S -y "${packages_to_install[@]}"
@@ -280,6 +308,20 @@ check_and_install_dependencies() {
     
     if ! command_exists espeak-ng; then
         log_warn "espeak-ng installation may have failed. Piper may not work correctly."
+    fi
+    
+    # Verify clipboard utilities
+    local clipboard_ok=false
+    if command_exists wl-paste; then
+        log_success "wl-paste verified (Wayland clipboard support)"
+        clipboard_ok=true
+    fi
+    if command_exists xclip; then
+        log_success "xclip verified (X11 clipboard support)"
+        clipboard_ok=true
+    fi
+    if [ "$clipboard_ok" = false ]; then
+        log_warn "Clipboard utilities installation may have failed. App may not be able to read selected text."
     fi
     
     log_success "Dependencies installed successfully"
