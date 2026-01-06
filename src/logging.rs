@@ -279,6 +279,7 @@ pub fn set_verbosity(level: LogLevel) {
 /// Get the default log directory path.
 ///
 /// Useful for displaying to the user where logs are stored.
+#[allow(dead_code)]
 pub fn default_log_dir() -> PathBuf {
     resolve_log_dir(&LoggingConfig::default())
 }

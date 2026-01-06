@@ -2,7 +2,7 @@
 
 use iced::window;
 use iced::{Size, Task};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::config;
 use crate::logging;
@@ -16,15 +16,23 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::SkipBackward => {
             if let Some(ref mut provider) = app.provider {
+                trace!(seconds = SKIP_SECONDS, "Skip backward requested");
                 provider.skip_backward(SKIP_SECONDS);
                 app.progress = provider.get_progress();
+                debug!(progress = app.progress, "Skip backward applied");
+            } else {
+                warn!("SkipBackward received with no active provider");
             }
             Task::none()
         }
         Message::SkipForward => {
             if let Some(ref mut provider) = app.provider {
+                trace!(seconds = SKIP_SECONDS, "Skip forward requested");
                 provider.skip_forward(SKIP_SECONDS);
                 app.progress = provider.get_progress();
+                debug!(progress = app.progress, "Skip forward applied");
+            } else {
+                warn!("SkipForward received with no active provider");
             }
             Task::none()
         }
@@ -32,27 +40,44 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             if let Some(ref mut provider) = app.provider {
                 match app.playback_state {
                     PlaybackState::Playing => {
-                        if provider.pause().is_ok() {
-                            app.playback_state = PlaybackState::Paused;
-                        }
+                        match provider.pause() {
+                            Ok(()) => {
+                                app.playback_state = PlaybackState::Paused;
+                                info!("Playback paused");
+                            }
+                            Err(e) => {
+                                error!(error = %e, "Failed to pause playback");
+                            }
+                        };
                     }
                     PlaybackState::Paused => {
-                        if provider.resume().is_ok() {
-                            app.playback_state = PlaybackState::Playing;
-                        }
+                        match provider.resume() {
+                            Ok(()) => {
+                                app.playback_state = PlaybackState::Playing;
+                                info!("Playback resumed");
+                            }
+                            Err(e) => {
+                                error!(error = %e, "Failed to resume playback");
+                            }
+                        };
                     }
                     PlaybackState::Stopped => {}
                 }
+            } else {
+                warn!("PlayPause received with no active provider");
             }
             Task::none()
         }
         Message::Stop => {
             if let Some(ref mut provider) = app.provider {
-                provider.stop().ok();
+                if let Err(e) = provider.stop() {
+                    error!(error = %e, "Failed to stop playback");
+                }
             }
             app.playback_state = PlaybackState::Stopped;
             app.progress = 0.0;
             app.frequency_bands = vec![0.0; NUM_BANDS];
+            info!("Playback stopped, closing main window");
             window::latest().and_then(window::close)
         }
         Message::Tick => {
@@ -61,9 +86,12 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 app.frequency_bands = provider.get_frequency_bands(NUM_BANDS);
 
                 if !provider.is_playing() && !provider.is_paused() {
+                    info!("Playback finished, stopping and closing window");
                     app.playback_state = PlaybackState::Stopped;
                     return window::latest().and_then(window::close);
                 }
+            } else {
+                trace!("Tick received with no active provider");
             }
             Task::none()
         }

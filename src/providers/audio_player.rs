@@ -9,6 +9,7 @@ use std::thread;
 
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use rustfft::{num_complex::Complex, FftPlanner};
+use tracing::{debug, error, trace};
 
 use super::TTSError;
 
@@ -47,8 +48,13 @@ pub struct AudioPlayer {
 impl AudioPlayer {
     /// Create a new audio player with the given sample rate.
     pub fn new(sample_rate: u32) -> Result<Self, TTSError> {
-        let (stream, stream_handle) = OutputStream::try_default()
-            .map_err(|e| TTSError::AudioError(format!("Failed to open audio output: {e}")))?;
+        trace!(sample_rate, "AudioPlayer::new");
+        let (stream, stream_handle) = OutputStream::try_default().map_err(|e| {
+            error!("Failed to open audio output: {e}");
+            TTSError::AudioError(format!("Failed to open audio output: {e}"))
+        })?;
+
+        debug!(sample_rate, "Audio output stream initialized");
 
         Ok(Self {
             sample_rate,
@@ -64,6 +70,7 @@ impl AudioPlayer {
     /// Call this after synthesizing audio. The audio_data should be normalized
     /// f32 samples in the range -1.0 to 1.0.
     pub fn play_audio(&mut self, audio_data: Vec<f32>) -> Result<(), TTSError> {
+        debug!(samples = audio_data.len(), "AudioPlayer::play_audio");
         // Store audio data
         {
             let mut state = self.state.lock().unwrap();
@@ -91,6 +98,7 @@ impl AudioPlayer {
 
     /// Pause the current playback.
     pub fn pause(&mut self) -> Result<(), TTSError> {
+        trace!("AudioPlayer::pause");
         if let Some(ref sink) = self.sink {
             sink.pause();
         }
@@ -104,6 +112,7 @@ impl AudioPlayer {
 
     /// Resume paused playback.
     pub fn resume(&mut self) -> Result<(), TTSError> {
+        trace!("AudioPlayer::resume");
         if let Some(ref sink) = self.sink {
             sink.play();
         }
@@ -117,6 +126,7 @@ impl AudioPlayer {
 
     /// Stop playback and reset position.
     pub fn stop(&mut self) -> Result<(), TTSError> {
+        trace!("AudioPlayer::stop");
         if let Some(sink) = self.sink.take() {
             sink.stop();
         }
@@ -143,6 +153,7 @@ impl AudioPlayer {
 
     /// Skip forward by the given number of seconds.
     pub fn skip_forward(&mut self, seconds: f32) {
+        trace!(seconds, "AudioPlayer::skip_forward");
         let samples_to_skip = (seconds * self.sample_rate as f32) as usize;
         let new_position = {
             let state = self.state.lock().unwrap();
@@ -153,6 +164,7 @@ impl AudioPlayer {
 
     /// Skip backward by the given number of seconds.
     pub fn skip_backward(&mut self, seconds: f32) {
+        trace!(seconds, "AudioPlayer::skip_backward");
         let samples_to_skip = (seconds * self.sample_rate as f32) as usize;
         let new_position = {
             let state = self.state.lock().unwrap();
@@ -238,6 +250,7 @@ impl AudioPlayer {
 
     /// Start audio playback from current position.
     fn start_playback(&mut self) -> Result<(), TTSError> {
+        trace!("AudioPlayer::start_playback");
         // Stop any existing playback first
         if let Some(sink) = self.sink.take() {
             sink.stop();
@@ -272,11 +285,15 @@ impl AudioPlayer {
 
         // Create decoder and sink
         let cursor = Cursor::new(wav_data);
-        let source = Decoder::new(cursor)
-            .map_err(|e| TTSError::AudioError(format!("Failed to decode audio: {e}")))?;
+        let source = Decoder::new(cursor).map_err(|e| {
+            error!("Failed to decode audio: {e}");
+            TTSError::AudioError(format!("Failed to decode audio: {e}"))
+        })?;
 
-        let sink = Sink::try_new(stream_handle)
-            .map_err(|e| TTSError::AudioError(format!("Failed to create audio sink: {e}")))?;
+        let sink = Sink::try_new(stream_handle).map_err(|e| {
+            error!("Failed to create audio sink: {e}");
+            TTSError::AudioError(format!("Failed to create audio sink: {e}"))
+        })?;
 
         sink.append(source);
         self.sink = Some(sink);
@@ -296,6 +313,11 @@ impl AudioPlayer {
 
     /// Create a WAV file in memory from i16 samples.
     fn create_wav(samples: &[i16], sample_rate: u32) -> Vec<u8> {
+        trace!(
+            samples = samples.len(),
+            sample_rate,
+            "AudioPlayer::create_wav"
+        );
         let num_samples = samples.len();
         let data_size = num_samples * 2; // 16-bit = 2 bytes per sample
         let file_size = 36 + data_size;
@@ -329,6 +351,11 @@ impl AudioPlayer {
 
     /// Start a background thread to track playback position.
     fn start_position_tracker_from(&self, start_position: usize) {
+        trace!(
+            start_position,
+            sample_rate = self.sample_rate,
+            "AudioPlayer::start_position_tracker_from"
+        );
         let state = Arc::clone(&self.state);
         let sample_rate = self.sample_rate;
 
@@ -376,6 +403,7 @@ impl AudioPlayer {
 
     /// Seek to a new position and restart playback.
     fn seek_to(&mut self, position: usize) -> Result<(), TTSError> {
+        trace!(position, "AudioPlayer::seek_to");
         let was_playing = {
             let state = self.state.lock().unwrap();
             state.is_playing && !state.is_paused

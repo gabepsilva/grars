@@ -3,10 +3,10 @@
 //! Uses the Piper binary to synthesize speech from text and plays it using rodio.
 
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use tracing::{debug, info};
+use tracing::{debug, error, info, warn};
 
 use super::audio_player::AudioPlayer;
 use super::{TTSError, TTSProvider};
@@ -46,6 +46,22 @@ impl PiperTTSProvider {
         info!("Initializing Piper TTS provider");
         debug!(?piper_bin, ?model_path, "Piper configuration");
 
+        // Validate that the binary and model actually exist before continuing.
+        if !piper_bin.is_file() {
+            error!(?piper_bin, "Piper binary not found");
+            return Err(TTSError::ProcessError(format!(
+                "Piper binary not found at {}",
+                piper_bin.display()
+            )));
+        }
+        if !model_with_extension(&model_path).is_file() {
+            error!(?model_path, "Piper model file (.onnx) not found");
+            return Err(TTSError::ProcessError(format!(
+                "Piper model (.onnx) not found at {}",
+                model_with_extension(&model_path).display()
+            )));
+        }
+
         // Piper uses 22050 Hz sample rate
         let player = AudioPlayer::new(22050)?;
 
@@ -62,6 +78,7 @@ impl PiperTTSProvider {
         if let Some(data_dir) = dirs::data_dir() {
             let user_piper = data_dir.join("grars").join("venv").join("bin").join("piper");
             if user_piper.exists() {
+                debug!(path = %user_piper.display(), "Using user-installed piper binary");
                 return user_piper;
             }
         }
@@ -75,6 +92,7 @@ impl PiperTTSProvider {
                 .join("bin")
                 .join("piper");
             if grafl_piper.exists() {
+                debug!(path = %grafl_piper.display(), "Using grafl dev piper binary");
                 return grafl_piper;
             }
         }
@@ -85,19 +103,26 @@ impl PiperTTSProvider {
                 if let Ok(path) = String::from_utf8(output.stdout) {
                     let path = path.trim();
                     if !path.is_empty() {
-                        return PathBuf::from(path);
+                        let path_buf = PathBuf::from(path);
+                        debug!(path = %path_buf.display(), "Using piper from PATH");
+                        return path_buf;
                     }
                 }
             }
         }
 
         // Fallback to user location (will fail validation)
-        dirs::data_dir()
+        let fallback = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("grars")
             .join("venv")
             .join("bin")
-            .join("piper")
+            .join("piper");
+        warn!(
+            path = %fallback.display(),
+            "Piper binary not found in known locations, using fallback path"
+        );
+        fallback
     }
 
     /// Find the model file in standard locations.
@@ -108,6 +133,10 @@ impl PiperTTSProvider {
         if let Ok(current_dir) = env::current_dir() {
             let project_model = current_dir.join("models").join(model_name);
             if project_model.with_extension("onnx").exists() {
+                debug!(
+                    path = %project_model.with_extension("onnx").display(),
+                    "Using project Piper model"
+                );
                 return project_model;
             }
         }
@@ -116,17 +145,31 @@ impl PiperTTSProvider {
         if let Some(data_dir) = dirs::data_dir() {
             let user_model = data_dir.join("grars").join("models").join(model_name);
             if user_model.with_extension("onnx").exists() {
+                debug!(
+                    path = %user_model.with_extension("onnx").display(),
+                    "Using user-installed Piper model"
+                );
                 return user_model;
             }
         }
 
         // Fallback to user location (will fail validation)
-        dirs::data_dir()
+        let fallback = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("grars")
             .join("models")
-            .join(model_name)
+            .join(model_name);
+        warn!(
+            path = %fallback.with_extension("onnx").display(),
+            "Piper model not found in known locations, using fallback path"
+        );
+        fallback
     }
+}
+
+/// Helper to get the model path including the `.onnx` extension.
+fn model_with_extension(path: &Path) -> PathBuf {
+    path.with_extension("onnx")
 }
 
 impl TTSProvider for PiperTTSProvider {
