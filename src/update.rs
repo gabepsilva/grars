@@ -3,9 +3,9 @@
 use iced::window;
 use iced::{Task, Size};
 
-use crate::model::{App, Message, PlaybackState};
+use crate::model::{App, Message, PlaybackState, TTSBackend};
 use crate::config;
-use crate::providers::{PiperTTSProvider, TTSProvider};
+use crate::providers::{PiperTTSProvider, PollyTTSProvider, TTSProvider};
 
 const SKIP_SECONDS: f32 = 5.0;
 const NUM_BANDS: usize = 10;
@@ -108,10 +108,25 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             if app.main_window_id.is_none() {
                 app.main_window_id = Some(id);
                 
-                // Initialize piper and start speaking now that window is visible
+                // Initialize TTS provider and start speaking now that window is visible
                 if let Some(text) = app.pending_text.take() {
-                    eprintln!("Initializing Piper TTS for {} bytes", text.len());
-                    match PiperTTSProvider::new() {
+                    eprintln!(
+                        "Initializing {:?} TTS for {} bytes",
+                        app.selected_backend,
+                        text.len()
+                    );
+
+                    let provider_result: Result<Box<dyn TTSProvider>, _> =
+                        match app.selected_backend {
+                            TTSBackend::Piper => {
+                                PiperTTSProvider::new().map(|p| Box::new(p) as Box<dyn TTSProvider>)
+                            }
+                            TTSBackend::AwsPolly => {
+                                PollyTTSProvider::new().map(|p| Box::new(p) as Box<dyn TTSProvider>)
+                            }
+                        };
+
+                    match provider_result {
                         Ok(mut provider) => {
                             if let Err(e) = provider.speak(&text) {
                                 eprintln!("TTS error: {e}");
@@ -121,7 +136,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                             }
                         }
                         Err(e) => {
-                            eprintln!("Failed to initialize Piper TTS: {e}");
+                            eprintln!("Failed to initialize TTS: {e}");
                         }
                     }
                 }

@@ -1,7 +1,7 @@
 //! Domain model for the application state
 
 use iced::window;
-use crate::providers::PiperTTSProvider;
+use crate::providers::TTSProvider;
 use crate::config;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,13 +43,13 @@ pub enum Message {
 
 /// Application state.
 ///
-/// Note: Does not derive `Clone` because `PiperTTSProvider` contains
+/// Note: Does not derive `Clone` because the TTS provider contains
 /// audio resources that cannot be cloned.
 pub struct App {
     pub playback_state: PlaybackState,
     pub progress: f32,
     pub frequency_bands: Vec<f32>,
-    pub provider: Option<PiperTTSProvider>,
+    pub provider: Option<Box<dyn TTSProvider>>,
     pub selected_backend: TTSBackend,
     pub log_level: LogLevel,
     pub show_settings_modal: bool,

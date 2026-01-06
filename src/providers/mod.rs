@@ -3,9 +3,12 @@
 //! This module defines the [`TTSProvider`] trait and provides implementations
 //! for different TTS engines.
 
+mod audio_player;
 mod piper;
+mod polly;
 
 pub use piper::PiperTTSProvider;
+pub use polly::PollyTTSProvider;
 
 use thiserror::Error;
 
