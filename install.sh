@@ -96,6 +96,20 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Download file using curl or wget (whichever is available)
+download_file() {
+    local url="$1"
+    local output="$2"
+    
+    if command_exists curl; then
+        curl -fsSL -o "$output" "$url"
+    elif command_exists wget; then
+        wget -q -O "$output" "$url"
+    else
+        return 1
+    fi
+}
+
 # Check all required dependencies and install if missing
 check_and_install_dependencies() {
     local missing_deps=()
@@ -455,44 +469,27 @@ download_model() {
         return 1
     }
     
-    # Download model files using wget or curl
-    if command_exists wget; then
-        log_info "Downloading $MODEL_NAME.onnx..."
-        if wget -q "$MODEL_BASE_URL/$MODEL_NAME.onnx" -O "$MODEL_NAME.onnx"; then
-            log_info "Downloading $MODEL_NAME.onnx.json..."
-            if wget -q "$MODEL_BASE_URL/$MODEL_NAME.onnx.json" -O "$MODEL_NAME.onnx.json"; then
-                if [ -f "$MODEL_NAME.onnx" ] && [ -f "$MODEL_NAME.onnx.json" ]; then
-                    log_success "Model downloaded successfully to $MODELS_DIR"
-                    cd - >/dev/null || true
-                    return 0
-                fi
+    # Download model files
+    log_info "Downloading $MODEL_NAME.onnx..."
+    if download_file "$MODEL_BASE_URL/$MODEL_NAME.onnx" "$MODEL_NAME.onnx"; then
+        log_info "Downloading $MODEL_NAME.onnx.json..."
+        if download_file "$MODEL_BASE_URL/$MODEL_NAME.onnx.json" "$MODEL_NAME.onnx.json"; then
+            if [ -f "$MODEL_NAME.onnx" ] && [ -f "$MODEL_NAME.onnx.json" ]; then
+                log_success "Model downloaded successfully to $MODELS_DIR"
+                cd - >/dev/null || true
+                return 0
             fi
         fi
-        # Cleanup on failure
-        rm -f "$MODEL_NAME.onnx" "$MODEL_NAME.onnx.json"
-        log_error "Failed to download model files using wget"
-    elif command_exists curl; then
-        log_info "Downloading $MODEL_NAME.onnx..."
-        if curl -sSL -o "$MODEL_NAME.onnx" "$MODEL_BASE_URL/$MODEL_NAME.onnx"; then
-            log_info "Downloading $MODEL_NAME.onnx.json..."
-            if curl -sSL -o "$MODEL_NAME.onnx.json" "$MODEL_BASE_URL/$MODEL_NAME.onnx.json"; then
-                if [ -f "$MODEL_NAME.onnx" ] && [ -f "$MODEL_NAME.onnx.json" ]; then
-                    log_success "Model downloaded successfully to $MODELS_DIR"
-                    cd - >/dev/null || true
-                    return 0
-                fi
-            fi
-        fi
-        # Cleanup on failure
-        rm -f "$MODEL_NAME.onnx" "$MODEL_NAME.onnx.json"
-        log_error "Failed to download model files using curl"
-    else
-        log_error "Neither wget nor curl found. Please install one to download models."
-        cd - >/dev/null || true
-        return 1
     fi
-    
+    # Cleanup on failure
+    rm -f "$MODEL_NAME.onnx" "$MODEL_NAME.onnx.json"
+    if ! command_exists curl && ! command_exists wget; then
+        log_error "Neither wget nor curl found. Please install one to download models."
+    else
+        log_error "Failed to download model files"
+    fi
     cd - >/dev/null || true
+    return 1
     
     # If download failed, provide manual instructions
     log_warn "Automatic model download failed"
@@ -553,12 +550,14 @@ detect_arch() {
 get_latest_release() {
     log_info "Fetching latest release from GitHub..."
     
-    if command_exists curl; then
-        LATEST_RELEASE=$(curl -s "$GITHUB_API/releases/latest" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
-    elif command_exists wget; then
-        LATEST_RELEASE=$(wget -qO- "$GITHUB_API/releases/latest" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+    local temp_file
+    temp_file=$(mktemp)
+    if download_file "$GITHUB_API/releases/latest" "$temp_file" 2>/dev/null; then
+        LATEST_RELEASE=$(grep '"tag_name":' "$temp_file" 2>/dev/null | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+        rm -f "$temp_file"
     else
         LATEST_RELEASE=""
+        rm -f "$temp_file"
     fi
     
     if [ -z "$LATEST_RELEASE" ]; then
@@ -587,29 +586,17 @@ download_and_install_binary() {
     RELEASE_TAG="${RELEASE_TAG:-v1.0.0}"
     DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$RELEASE_TAG/$BINARY_NAME"
     
-    log_info "Download URL: $DOWNLOAD_URL"
-    
     # Download binary
-    if command_exists curl; then
-        if curl -fsSL -o "$GRARS_BIN" "$DOWNLOAD_URL"; then
-            chmod +x "$GRARS_BIN"
-            log_success "Binary downloaded and installed to $GRARS_BIN"
-            return 0
-        else
-            log_error "Failed to download binary from $DOWNLOAD_URL"
-            return 1
-        fi
-    elif command_exists wget; then
-        if wget -q -O "$GRARS_BIN" "$DOWNLOAD_URL"; then
-            chmod +x "$GRARS_BIN"
-            log_success "Binary downloaded and installed to $GRARS_BIN"
-            return 0
-        else
-            log_error "Failed to download binary from $DOWNLOAD_URL"
-            return 1
-        fi
+    if download_file "$DOWNLOAD_URL" "$GRARS_BIN"; then
+        chmod +x "$GRARS_BIN"
+        log_success "Binary downloaded and installed to $GRARS_BIN"
+        return 0
     else
-        log_error "Neither curl nor wget found. Please install one."
+        if ! command_exists curl && ! command_exists wget; then
+            log_error "Neither curl nor wget found. Please install one."
+        else
+            log_error "Failed to download binary from $DOWNLOAD_URL"
+        fi
         return 1
     fi
 }
@@ -661,6 +648,50 @@ install_binary() {
     return 1
 }
 
+# Install desktop file and icon
+install_desktop() {
+    DESKTOP_DIR="$HOME/.local/share/applications"
+    ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+    DESKTOP_FILE="$DESKTOP_DIR/grars.desktop"
+    ICON_FILE="$ICON_DIR/grars.svg"
+    
+    # Get script directory (or current directory if script is not available)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || pwd)"
+    
+    # Create directories
+    mkdir -p "$DESKTOP_DIR"
+    mkdir -p "$ICON_DIR"
+    
+    # Install desktop file if available
+    if [ -f "$SCRIPT_DIR/grars.desktop" ]; then
+        sed "s#\\\$HOME#$HOME#g" "$SCRIPT_DIR/grars.desktop" > "$DESKTOP_FILE"
+        chmod 644 "$DESKTOP_FILE"
+        log_success "Desktop file installed to $DESKTOP_FILE"
+        
+        # Update desktop database if available
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+            log_info "Desktop database updated"
+        fi
+    else
+        log_warn "Desktop file not found at $SCRIPT_DIR/grars.desktop (skipping)"
+    fi
+    
+    # Install icon if available
+    if [ -f "$SCRIPT_DIR/assets/logo.svg" ]; then
+        cp "$SCRIPT_DIR/assets/logo.svg" "$ICON_FILE"
+        log_success "Icon installed to $ICON_FILE"
+        
+        # Update icon cache if available
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+            log_info "Icon cache updated"
+        fi
+    else
+        log_warn "Icon not found at $SCRIPT_DIR/assets/logo.svg (skipping)"
+    fi
+}
+
 # Main installation function
 main() {
     echo "=========================================="
@@ -677,6 +708,10 @@ main() {
     # Download model if not present (download_model checks if it exists first)
     echo ""
     download_model
+    
+    # Install desktop file and icon
+    echo ""
+    install_desktop
     
     echo ""
     log_success "Installation complete!"

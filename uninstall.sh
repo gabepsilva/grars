@@ -77,6 +77,8 @@ USER_DIR="$HOME/.local/share/grars"
 USER_VENV="$USER_DIR/venv"
 USER_MODELS="$USER_DIR/models"
 GRARS_BIN="$HOME/.local/bin/grars"
+DESKTOP_FILE="$HOME/.local/share/applications/grars.desktop"
+ICON_FILE="$HOME/.local/share/icons/hicolor/scalable/apps/grars.svg"
 
 CLEAN_PROJECT=false
 CLEAN_USER=false
@@ -147,6 +149,12 @@ if [ "$CLEAN_USER" = true ]; then
     if [ -f "$GRARS_BIN" ]; then
         ITEMS_TO_REMOVE+=("grars binary: $GRARS_BIN")
     fi
+    if [ -f "$DESKTOP_FILE" ]; then
+        ITEMS_TO_REMOVE+=("Desktop file: $DESKTOP_FILE")
+    fi
+    if [ -f "$ICON_FILE" ]; then
+        ITEMS_TO_REMOVE+=("Icon: $ICON_FILE")
+    fi
 fi
 
 if [ ${#ITEMS_TO_REMOVE[@]} -eq 0 ]; then
@@ -205,6 +213,32 @@ if [ "$CLEAN_USER" = true ]; then
         log_info "Removing grars binary: $GRARS_BIN"
         rm -f "$GRARS_BIN"
         log_success "Removed grars binary"
+    fi
+    
+    # Remove desktop file
+    if [ -f "$DESKTOP_FILE" ]; then
+        log_info "Removing desktop file: $DESKTOP_FILE"
+        rm -f "$DESKTOP_FILE"
+        log_success "Removed desktop file"
+        
+        # Update desktop database if available
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+            log_info "Desktop database updated"
+        fi
+    fi
+    
+    # Remove icon
+    if [ -f "$ICON_FILE" ]; then
+        log_info "Removing icon: $ICON_FILE"
+        rm -f "$ICON_FILE"
+        log_success "Removed icon"
+        
+        # Update icon cache if available
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+            log_info "Icon cache updated"
+        fi
     fi
     
     # Remove user directory if it's empty

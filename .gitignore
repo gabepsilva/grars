@@ -10,3 +10,6 @@ Cargo.lock
 
 venv/
 models/
+
+# IDE - Personal settings
+.vscode/settings.json
