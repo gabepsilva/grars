@@ -363,9 +363,46 @@ install_piper() {
     log_info "Upgrading pip..."
     pip install --quiet --upgrade pip
     
+    # Clear pip cache to avoid dependency conflicts (especially on Fedora)
+    log_info "Clearing pip cache..."
+    pip cache purge 2>/dev/null || true
+    
+    # Install onnxruntime first (required dependency for piper-tts)
+    # This helps with dependency resolution, especially on Python 3.14+
+    log_info "Installing onnxruntime (required dependency)..."
+    if ! pip install --quiet "onnxruntime<2,>=1"; then
+        log_warn "Standard onnxruntime installation failed, trying nightly build..."
+        log_info "Nightly builds support newer Python versions (e.g., 3.14+)"
+        if ! pip install --quiet --pre onnxruntime \
+            --extra-index-url=https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/; then
+            log_error "Failed to install onnxruntime (required by piper-tts)"
+            log_error "This may be due to Python version incompatibility"
+            deactivate
+            exit 1
+        else
+            log_success "onnxruntime nightly build installed successfully"
+        fi
+    else
+        log_success "onnxruntime installed successfully"
+    fi
+    
     # Install piper-tts
+    # Since we already have onnxruntime installed, try installing piper-tts
+    # First try normal installation, then try without dependency checks
     log_info "Installing piper-tts package..."
-    pip install --quiet piper-tts
+    if ! pip install --quiet --upgrade --force-reinstall piper-tts; then
+        log_warn "Standard installation failed, trying without dependency checks..."
+        log_info "Installing piper-tts without dependency resolution (deps already installed)..."
+        # Install piper-tts without checking dependencies since we have onnxruntime
+        if ! pip install --quiet --upgrade --force-reinstall --no-deps piper-tts; then
+            log_error "Failed to install piper-tts"
+            deactivate
+            exit 1
+        fi
+        # Install other piper-tts dependencies that might be missing
+        log_info "Installing piper-tts dependencies..."
+        pip install --quiet piper-phonemize || true
+    fi
     
     # Verify installation
     if [ ! -f "$VENV_DIR/bin/piper" ]; then

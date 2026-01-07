@@ -1,0 +1,22 @@
+---
+alwaysApply: false
+---
+
+# TEST VMS
+no password required for ssh
+su - root should work, and you can use as need password is 123
+
+
+## Ubuntu Desktop Minimal
+ssh vboxuser@localhost -p 2222
+
+## Manjaro KDE
+ssh vboxuser@localhost -p 2223
+
+## Fedora 43 Workstation
+ssh vboxuser@localhost -p 2224
+
+## PopOs Cosmic
+ssh vboxuser@localhost -p 2225
+
+
