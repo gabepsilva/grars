@@ -1,29 +1,4 @@
 #!/bin/bash
-# Installation script for grars
-# Supports multiple Linux distributions: Arch, Debian/Ubuntu, Fedora, openSUSE, Alpine, Void, etc.
-#
-# Install directly via URL:
-#   curl -fsSL https://raw.githubusercontent.com/gabepsilva/grars/main/install.sh | bash
-#
-# This script will:
-#   1. Detect your Linux distribution
-#   2. Install system dependencies (espeak-ng, Python3, venv, wl-clipboard/xclip)
-#   3. Install grars binary (tries local build first, then downloads from GitHub)
-#   4. Install grars to ~/.local/bin
-#   5. Set up piper-tts dependencies (venv, piper-tts package, voice models)
-#
-# Usage:
-#   # Direct installation via URL (recommended)
-#   curl -fsSL https://raw.githubusercontent.com/gabepsilva/grars/main/install.sh | bash
-#   # or
-#   wget -qO- https://raw.githubusercontent.com/gabepsilva/grars/main/install.sh | bash
-#
-#   # Or download and run locally
-#   ./install.sh
-#
-# Requirements:
-#   - sudo access (for installing system packages)
-#   - Internet connection (for downloading binary, packages and models)
 
 set -euo pipefail
 
@@ -668,7 +643,16 @@ install_desktop() {
         chmod 644 "$DESKTOP_FILE"
         log_success "Desktop file installed to $DESKTOP_FILE"
         
-        # Update desktop database if available
+        # Update desktop database (try multiple methods for different DEs)
+        # KDE uses kbuildsycoca (Plasma 5/6)
+        if command -v kbuildsycoca6 >/dev/null 2>&1; then
+            kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+            log_info "KDE 6 application database updated"
+        elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+            kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
+            log_info "KDE 5 application database updated"
+        fi
+        # Generic freedesktop.org tool (works on GNOME, XFCE, etc.)
         if command -v update-desktop-database >/dev/null 2>&1; then
             update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
             log_info "Desktop database updated"
@@ -682,10 +666,17 @@ install_desktop() {
         cp "$SCRIPT_DIR/assets/logo.svg" "$ICON_FILE"
         log_success "Icon installed to $ICON_FILE"
         
-        # Update icon cache if available
+        # Update icon cache (try multiple methods for different DEs)
+        # GTK-based DEs (GNOME, XFCE, etc.)
         if command -v gtk-update-icon-cache >/dev/null 2>&1; then
             gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
-            log_info "Icon cache updated"
+            log_info "GTK icon cache updated"
+        fi
+        # KDE uses kbuildsycoca for icons too
+        if command -v kbuildsycoca6 >/dev/null 2>&1; then
+            kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+        elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+            kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
         fi
     else
         log_warn "Icon not found at $SCRIPT_DIR/assets/logo.svg (skipping)"
