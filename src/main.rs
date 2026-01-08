@@ -29,19 +29,8 @@ fn main() -> iced::Result {
 
     info!("grars starting up");
 
-    // Read selected text at startup
-    let selected_text = crate::system::get_selected_text();
-
-    if let Some(ref text) = selected_text {
-        info!(bytes = text.len(), preview = %text.chars().take(50).collect::<String>(), "Text selected at startup");
-    } else {
-        info!("No text selected at startup - app will wait for text or close");
-    }
-
-    // Store selected text for later initialization after window appears
-    crate::app::set_initial_text(selected_text);
-
     // Use daemon for multi-window support (view receives window::Id)
+    // Note: Text selection is now fetched asynchronously after UI appears for blazing fast startup
     daemon(crate::app::new, crate::app::update, crate::app::view)
         .title(crate::app::title)
         .subscription(crate::app::subscription)

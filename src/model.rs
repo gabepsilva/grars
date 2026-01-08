@@ -39,7 +39,8 @@ pub enum Message {
     LogLevelSelected(LogLevel),
     WindowOpened(window::Id),
     WindowClosed(window::Id),
-    InitIfReady, // Fallback: initialize TTS if window is ready but event didn't fire
+    TTSInitialized(Result<(), String>), // Result of async TTS initialization
+    SelectedTextFetched(Option<String>), // Result of async text selection fetch
 }
 
 /// Application state.

@@ -3,33 +3,20 @@
 use iced::time::{self, Duration};
 use iced::{Element, Size, Subscription, Task};
 use iced::window;
-use std::cell::RefCell;
 use tracing::info;
 
 use crate::model::{App, Message, PlaybackState};
 use crate::update;
 use crate::view;
 
-thread_local! {
-    static INITIAL_TEXT: RefCell<Option<String>> = const { RefCell::new(None) };
-}
-
-pub fn set_initial_text(text: Option<String>) {
-    INITIAL_TEXT.with(|t| *t.borrow_mut() = text);
-}
-
 pub fn new() -> (App, Task<Message>) {
-    let text = INITIAL_TEXT.with(|t| t.borrow_mut().take());
-    let app = App::new(text);
+    // Create app immediately without waiting for anything
+    let app = App::new(None);
     
-    // Log initial state for debugging
-    if let Some(ref pending) = app.pending_text {
-        info!(bytes = pending.len(), "App created with pending text");
-    } else {
-        info!("App created with no pending text");
-    }
+    info!("App created, opening UI immediately");
     
     // Open the main window (daemon doesn't open one by default)
+    // This happens synchronously but is very fast - just window creation
     let (_main_window_id, open_task) = window::open(window::Settings {
         size: Size::new(360.0, 70.0),
         resizable: false,
@@ -40,20 +27,31 @@ pub fn new() -> (App, Task<Message>) {
     });
     let open_task = open_task.map(Message::WindowOpened);
     
-    // Send a delayed message to initialize TTS if WindowOpened event didn't fire
-    // This is a fallback for cases where the initial window doesn't trigger the event
-    let init_task = if app.pending_text.is_some() {
-        Task::perform(
-            async {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            },
-            |_| Message::InitIfReady,
-        )
-    } else {
-        Task::none()
-    };
+    // Fetch selected text asynchronously after UI appears (non-blocking)
+    // This runs in a background task so it doesn't delay the UI
+    let fetch_text_task = Task::perform(
+        async {
+            use tracing::debug;
+            debug!("Starting async text fetch task");
+            // Small delay to ensure window is fully visible before fetching
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            debug!("Delay complete, fetching selected text");
+            // Use spawn_blocking for the blocking shell command
+            let result = tokio::task::spawn_blocking(|| {
+                debug!("Executing get_selected_text in blocking thread");
+                crate::system::get_selected_text()
+            })
+            .await;
+            debug!("Text fetch task completed");
+            result.unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "Failed to join blocking task for text fetch");
+                None
+            })
+        },
+        Message::SelectedTextFetched,
+    );
     
-    (app, Task::batch([open_task, init_task]))
+    (app, Task::batch([open_task, fetch_text_task]))
 }
 
 pub fn title(app: &App, window: window::Id) -> String {
