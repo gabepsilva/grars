@@ -291,7 +291,7 @@ pub fn main_view(app: &App) -> Element<'_, Message> {
 
     // 5. Progress bar OR status text directly under the content row (not under gear)
     let (progress_or_status, gap_height): (Element<Message>, f32) = if let Some(status) = &app.status_text {
-        // Show status text during loading (no gap, positioned higher)
+        // Show status text during loading (pushed up above where progress bar would be)
         let elem = container(
             text(status)
                 .size(11)
@@ -300,12 +300,12 @@ pub fn main_view(app: &App) -> Element<'_, Message> {
                 }),
         )
         .width(Length::Fixed(313.0))
-        .height(Length::Fixed(12.0))
-        .padding([0.0, 19.0])
+        .height(Length::Fixed(33.0))
+        .padding([-6.0, 19.0])
         .into();
-        (elem, -5.0)
+        (elem, -8.0)
     } else {
-        // Show progress bar during playback
+        // Show progress bar during playback (stays in same position)
         let elem = container(progress_bar(0.0..=1.0, app.progress))
             .width(Length::Fixed(313.0))
             .height(Length::Fixed(1.0))

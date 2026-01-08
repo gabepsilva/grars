@@ -91,16 +91,17 @@ fn open_settings_window() -> (window::Id, Task<Message>) {
 /// Open settings window if not already open, setting error message and modal state.
 /// Returns the task if window was opened, otherwise Task::none().
 fn open_settings_if_needed(app: &mut App, error_msg: String) -> Task<Message> {
-    if app.settings_window_id.is_none() {
-        app.error_message = Some(error_msg);
+    let task = if app.settings_window_id.is_none() {
         let (window_id, task) = open_settings_window();
         app.settings_window_id = Some(window_id);
         app.show_settings_modal = true;
         task
     } else {
-        app.error_message = Some(error_msg);
         Task::none()
-    }
+    };
+
+    app.error_message = Some(error_msg);
+    task
 }
 
 /// Process text: send to cleanup API if enabled, otherwise return task to initialize TTS directly.
@@ -168,6 +169,7 @@ fn initialize_tts_async(
             std::thread::spawn(move || {
                 let mut send_provider = send_provider;
                 let provider = &mut send_provider.0;
+                info!(text = %text, "Synthesizing text");
                 let result = provider.speak(&text);
                 
                 match result {
