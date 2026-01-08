@@ -289,16 +289,35 @@ pub fn main_view(app: &App) -> Element<'_, Message> {
     .align_y(Alignment::Center)
     .padding([8.0, 16.0]);
 
-    // 5. Progress bar directly under the content row (not under gear)
-    let progress = container(progress_bar(0.0..=1.0, app.progress))
+    // 5. Progress bar OR status text directly under the content row (not under gear)
+    let (progress_or_status, gap_height): (Element<Message>, f32) = if let Some(status) = &app.status_text {
+        // Show status text during loading (no gap, positioned higher)
+        let elem = container(
+            text(status)
+                .size(11)
+                .style(|_theme| iced::widget::text::Style {
+                    color: Some(Color::from_rgba(1.0, 1.0, 1.0, 0.7)),
+                }),
+        )
         .width(Length::Fixed(313.0))
-        .height(Length::Fixed(1.0))
-        .padding([0.0, 19.0]);
+        .height(Length::Fixed(12.0))
+        .padding([0.0, 19.0])
+        .into();
+        (elem, -5.0)
+    } else {
+        // Show progress bar during playback
+        let elem = container(progress_bar(0.0..=1.0, app.progress))
+            .width(Length::Fixed(313.0))
+            .height(Length::Fixed(1.0))
+            .padding([0.0, 19.0])
+            .into();
+        (elem, 3.0)
+    };
 
     let content_column = column![
         content_row,
-        Space::new().height(Length::Fixed(3.0)), // small gap
-        progress,
+        Space::new().height(Length::Fixed(gap_height)),
+        progress_or_status,
     ]
     .width(Length::Shrink);
 

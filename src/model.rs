@@ -65,6 +65,8 @@ pub struct App {
     pub error_message: Option<String>,
     pub is_loading: bool,
     pub loading_animation_time: f32,
+    /// Status text shown during loading (e.g., "Cleaning text...", "Synthesizing voice...")
+    pub status_text: Option<String>,
 }
 
 impl Default for App {
@@ -85,6 +87,7 @@ impl Default for App {
             error_message: None,
             is_loading: false,
             loading_animation_time: 0.0,
+            status_text: None,
         }
     }
 }
@@ -111,6 +114,7 @@ impl App {
             error_message: None,
             is_loading: false,
             loading_animation_time: 0.0,
+            status_text: None,
         }
     }
 }

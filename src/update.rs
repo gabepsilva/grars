@@ -59,16 +59,18 @@ where
     Task::none()
 }
 
-/// Set loading state on the app.
-fn set_loading_state(app: &mut App) {
+/// Set loading state on the app with a status message.
+fn set_loading_state(app: &mut App, status: &str) {
     app.is_loading = true;
     app.loading_animation_time = 0.0;
+    app.status_text = Some(status.to_string());
 }
 
 /// Clear loading state on the app.
 fn clear_loading_state(app: &mut App) {
     app.is_loading = false;
     app.loading_animation_time = 0.0;
+    app.status_text = None;
 }
 
 /// Open the settings window with error display enabled.
@@ -108,15 +110,15 @@ fn process_text_for_tts(
     text: String,
     context: &'static str,
 ) -> Task<Message> {
-    set_loading_state(app);
-    
     if app.text_cleanup_enabled {
+        set_loading_state(app, "Cleaning text...");
         info!(context, "Text cleanup enabled, sending to API");
         Task::perform(
             async move { system::cleanup_text(&text).await },
             Message::TextCleanupResponse,
         )
     } else {
+        set_loading_state(app, "Synthesizing voice...");
         info!(context, "Initializing TTS directly");
         initialize_tts_async(app.selected_backend, text, context)
     }
@@ -255,8 +257,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             app.playback_state = PlaybackState::Stopped;
             app.progress = 0.0;
             app.frequency_bands = vec![0.0; NUM_BANDS];
-            app.is_loading = false;
-            app.loading_animation_time = 0.0;
+            clear_loading_state(app);
             info!("Playback stopped, closing main window");
             window::latest().and_then(window::close)
         }
@@ -425,6 +426,8 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             match result {
                 Ok(cleaned_text) => {
                     info!(bytes = cleaned_text.len(), "Text cleanup successful, initializing TTS");
+                    // Update status to show we're now synthesizing
+                    app.status_text = Some("Synthesizing voice...".to_string());
                     return initialize_tts_async(app.selected_backend, cleaned_text, "TextCleanupResponse");
                 }
                 Err(e) => {

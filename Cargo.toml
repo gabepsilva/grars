@@ -19,3 +19,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
 chrono = "0.4"          # For timestamp formatting in logs
 reqwest = { version = "0.12", features = ["json"] }  # HTTP client for text cleanup API
+pulldown-cmark = "0.9"  # Markdown parser for stripping formatting
