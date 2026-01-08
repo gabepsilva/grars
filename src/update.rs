@@ -64,7 +64,7 @@ fn open_settings_window() -> (window::Id, Task<Message>) {
     let (window_id, task) = window::open(window::Settings {
         size: Size::new(760.0, 360.0),
         resizable: false,
-        decorations: true,
+        decorations: false,
         transparent: false,
         visible: true,
         position: window::Position::Centered,
@@ -247,11 +247,17 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::Settings => {
+            // Prevent opening multiple settings windows
+            if app.settings_window_id.is_some() {
+                debug!("Settings window already open, ignoring request");
+                return Task::none();
+            }
+            
             debug!("Settings clicked");
             let (window_id, task) = window::open(window::Settings {
                 size: Size::new(760.0, 280.0),
                 resizable: false,
-                decorations: true,
+                decorations: false,
                 transparent: false,
                 visible: true,
                 position: window::Position::Centered,
