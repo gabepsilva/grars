@@ -52,6 +52,10 @@ struct RawConfig {
     /// Log level string, kept for compatibility (unused for now).
     #[serde(default)]
     log_level: Option<String>,
+
+    /// Whether text cleanup is enabled (sends text to cleanup API before TTS).
+    #[serde(default)]
+    text_cleanup_enabled: Option<bool>,
 }
 
 fn config_path() -> Option<PathBuf> {
@@ -206,4 +210,26 @@ pub fn save_log_level(level: LogLevel) {
     }
 }
 
+/// Load the persisted text cleanup enabled setting, defaulting to `false` if not set.
+pub fn load_text_cleanup_enabled() -> bool {
+    match load_raw_config() {
+        Ok(cfg) => cfg.text_cleanup_enabled.unwrap_or(false),
+        Err(err) => {
+            warn!(error = ?err, "Failed to load config, text cleanup disabled by default");
+            false
+        }
+    }
+}
+
+/// Persist the text cleanup enabled setting to disk.
+///
+/// Errors are logged and otherwise ignored.
+pub fn save_text_cleanup_enabled(enabled: bool) {
+    debug!(?enabled, "Saving text cleanup enabled");
+    let mut cfg = load_or_default_config();
+    cfg.text_cleanup_enabled = Some(enabled);
+    if let Err(err) = save_raw_config(cfg) {
+        error!(error = ?err, "Failed to save config");
+    }
+}
 

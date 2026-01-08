@@ -9,6 +9,7 @@ use crate::config;
 use crate::logging;
 use crate::model::{App, Message, PlaybackState, TTSBackend};
 use crate::providers::{PiperTTSProvider, PollyTTSProvider, TTSProvider};
+use crate::system;
 
 // Wrapper to make TTSProvider Send (required for cross-thread usage)
 // SAFETY: This is safe because we only move the provider between threads during initialization,
@@ -58,6 +59,18 @@ where
     Task::none()
 }
 
+/// Set loading state on the app.
+fn set_loading_state(app: &mut App) {
+    app.is_loading = true;
+    app.loading_animation_time = 0.0;
+}
+
+/// Clear loading state on the app.
+fn clear_loading_state(app: &mut App) {
+    app.is_loading = false;
+    app.loading_animation_time = 0.0;
+}
+
 /// Open the settings window with error display enabled.
 /// Returns the window ID and task mapped to Message::WindowOpened.
 fn open_settings_window() -> (window::Id, Task<Message>) {
@@ -71,6 +84,42 @@ fn open_settings_window() -> (window::Id, Task<Message>) {
         ..Default::default()
     });
     (window_id, task.map(Message::WindowOpened))
+}
+
+/// Open settings window if not already open, setting error message and modal state.
+/// Returns the task if window was opened, otherwise Task::none().
+fn open_settings_if_needed(app: &mut App, error_msg: String) -> Task<Message> {
+    if app.settings_window_id.is_none() {
+        app.error_message = Some(error_msg);
+        let (window_id, task) = open_settings_window();
+        app.settings_window_id = Some(window_id);
+        app.show_settings_modal = true;
+        task
+    } else {
+        app.error_message = Some(error_msg);
+        Task::none()
+    }
+}
+
+/// Process text: send to cleanup API if enabled, otherwise return task to initialize TTS directly.
+/// Sets loading state before returning.
+fn process_text_for_tts(
+    app: &mut App,
+    text: String,
+    context: &'static str,
+) -> Task<Message> {
+    set_loading_state(app);
+    
+    if app.text_cleanup_enabled {
+        info!(context, "Text cleanup enabled, sending to API");
+        Task::perform(
+            async move { system::cleanup_text(&text).await },
+            Message::TextCleanupResponse,
+        )
+    } else {
+        info!(context, "Initializing TTS directly");
+        initialize_tts_async(app.selected_backend, text, context)
+    }
 }
 
 /// Initialize TTS provider and start speaking with the given text asynchronously.
@@ -255,7 +304,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             
             debug!("Settings clicked");
             let (window_id, task) = window::open(window::Settings {
-                size: Size::new(760.0, 280.0),
+                size: Size::new(760.0, 360.0),
                 resizable: false,
                 decorations: false,
                 transparent: false,
@@ -310,6 +359,13 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             logging::set_verbosity(level);
             Task::none()
         }
+        Message::TextCleanupToggled(enabled) => {
+            info!(?enabled, "Text cleanup toggled");
+            app.text_cleanup_enabled = enabled;
+            // Persist the setting
+            config::save_text_cleanup_enabled(enabled);
+            Task::none()
+        }
         Message::WindowOpened(id) => {
             info!(?id, "Window opened event received");
             if app.main_window_id.is_none() {
@@ -318,10 +374,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 
                 // If we already have pending text (from async fetch), initialize TTS now
                 if let Some(text) = app.pending_text.take() {
-                    info!("Window opened with pending text, initializing TTS");
-                    app.is_loading = true;
-                    app.loading_animation_time = 0.0;
-                    return initialize_tts_async(app.selected_backend, text, "WindowOpened");
+                    return process_text_for_tts(app, text, "WindowOpened");
                 }
             } else {
                 debug!(?id, "Window opened but main window ID already set");
@@ -353,13 +406,10 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 info!("No text selected - app will wait for text or close");
             }
             
-                // Initialize TTS if window is already open, otherwise store for later
+            // Initialize TTS if window is already open, otherwise store for later
             if app.main_window_id.is_some() {
                 if let Some(text) = text {
-                    info!("Window ready, initializing TTS with fetched text");
-                    app.is_loading = true;
-                    app.loading_animation_time = 0.0;
-                    return initialize_tts_async(app.selected_backend, text, "SelectedTextFetched");
+                    return process_text_for_tts(app, text, "SelectedTextFetched");
                 } else {
                     warn!("No text selected - closing window");
                     return window::latest().and_then(window::close);
@@ -371,10 +421,22 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             }
             Task::none()
         }
+        Message::TextCleanupResponse(result) => {
+            match result {
+                Ok(cleaned_text) => {
+                    info!(bytes = cleaned_text.len(), "Text cleanup successful, initializing TTS");
+                    return initialize_tts_async(app.selected_backend, cleaned_text, "TextCleanupResponse");
+                }
+                Err(e) => {
+                    error!(error = %e, "Text cleanup API failed");
+                    clear_loading_state(app);
+                    return open_settings_if_needed(app, e);
+                }
+            }
+        }
         Message::TTSInitialized(result) => {
             // Clear loading state regardless of result
-            app.is_loading = false;
-            app.loading_animation_time = 0.0;
+            clear_loading_state(app);
             
             match result {
                 Ok(()) => {
@@ -396,14 +458,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 }
                 Err(e) => {
                     error!(error = %e, "TTS initialization failed");
-                    app.error_message = Some(e);
-                    // Auto-open settings if there's an error and settings aren't already open
-                    if app.settings_window_id.is_none() {
-                        let (window_id, task) = open_settings_window();
-                        app.settings_window_id = Some(window_id);
-                        app.show_settings_modal = true;
-                        return task;
-                    }
+                    return open_settings_if_needed(app, e);
                 }
             }
             Task::none()

@@ -37,10 +37,12 @@ pub enum Message {
     CloseSettings,
     ProviderSelected(TTSBackend),
     LogLevelSelected(LogLevel),
+    TextCleanupToggled(bool),
     WindowOpened(window::Id),
     WindowClosed(window::Id),
     TTSInitialized(Result<(), String>), // Result of async TTS initialization
     SelectedTextFetched(Option<String>), // Result of async text selection fetch
+    TextCleanupResponse(Result<String, String>), // Result of text cleanup API call
 }
 
 /// Application state.
@@ -54,6 +56,7 @@ pub struct App {
     pub provider: Option<Box<dyn TTSProvider>>,
     pub selected_backend: TTSBackend,
     pub log_level: LogLevel,
+    pub text_cleanup_enabled: bool,
     pub show_settings_modal: bool,
     pub settings_window_id: Option<window::Id>,
     pub current_window_id: Option<window::Id>,
@@ -73,6 +76,7 @@ impl Default for App {
             provider: None,
             selected_backend: TTSBackend::Piper,
             log_level: LogLevel::Info,
+            text_cleanup_enabled: false,
             show_settings_modal: false,
             settings_window_id: None,
             current_window_id: None,
@@ -90,6 +94,7 @@ impl App {
     pub fn new(pending_text: Option<String>) -> Self {
         let selected_backend = config::load_voice_provider();
         let log_level = config::load_log_level();
+        let text_cleanup_enabled = config::load_text_cleanup_enabled();
         Self {
             playback_state: PlaybackState::Stopped,
             progress: 0.0,
@@ -97,6 +102,7 @@ impl App {
             provider: None,
             selected_backend,
             log_level,
+            text_cleanup_enabled,
             show_settings_modal: false,
             settings_window_id: None,
             current_window_id: None,

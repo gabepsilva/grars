@@ -1,12 +1,12 @@
 //! UI rendering logic
 
-use iced::widget::{button, column, container, progress_bar, radio, row, svg, text, Space};
+use iced::widget::{button, checkbox, column, container, progress_bar, radio, row, svg, text, Space};
 use iced::{Alignment, Color, Element, Length};
 
 use crate::model::{App, LogLevel, Message, PlaybackState, TTSBackend};
 use crate::styles::{
     circle_button_style, modal_content_style, transparent_button_style, wave_bar_style,
-    white_radio_style, window_style,
+    white_checkbox_style, white_radio_style, window_style,
 };
 
 const MIN_HEIGHT: f32 = 4.0;
@@ -198,6 +198,16 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
     ]
     .spacing(4);
 
+    let text_cleanup_toggle = column![
+        white_text("Text Cleanup", 18),
+        Space::new().height(Length::Fixed(12.0)),
+        checkbox(app.text_cleanup_enabled)
+            .label("Enable text cleanup (sends text to local API before TTS)")
+            .on_toggle(Message::TextCleanupToggled)
+            .style(white_checkbox_style),
+    ]
+    .spacing(4);
+
     container(
         column![
             row![
@@ -211,6 +221,8 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
             provider_selector,
             Space::new().height(Length::Fixed(16.0)),
             log_level_selector,
+            Space::new().height(Length::Fixed(16.0)),
+            text_cleanup_toggle,
         ]
         .padding(30)
         .align_x(Alignment::Center),

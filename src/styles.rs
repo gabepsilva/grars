@@ -1,6 +1,6 @@
 //! Custom style functions for UI components (Iced 0.13+ closure-based API)
 
-use iced::widget::{button, container, radio};
+use iced::widget::{button, checkbox, container, radio};
 use iced::{Background, Border, Color, Theme};
 
 pub fn window_style(_theme: &Theme) -> container::Style {
@@ -74,6 +74,29 @@ pub fn white_radio_style(_theme: &Theme, _status: radio::Status) -> radio::Style
         dot_color: Color::from_rgb(0.4, 0.6, 1.0),
         border_width: 1.0,
         border_color: Color::from_rgba(1.0, 1.0, 1.0, 0.6),
+        text_color: Some(Color::WHITE),
+    }
+}
+
+/// White text checkbox style for dark backgrounds.
+pub fn white_checkbox_style(_theme: &Theme, status: checkbox::Status) -> checkbox::Style {
+    let is_checked = match status {
+        checkbox::Status::Active { is_checked } => is_checked,
+        checkbox::Status::Hovered { is_checked } => is_checked,
+        checkbox::Status::Disabled { is_checked } => is_checked,
+    };
+    checkbox::Style {
+        background: Background::Color(if is_checked {
+            Color::from_rgb(0.4, 0.6, 1.0)
+        } else {
+            Color::TRANSPARENT
+        }),
+        icon_color: Color::WHITE,
+        border: Border {
+            color: Color::from_rgba(1.0, 1.0, 1.0, 0.6),
+            width: 1.0,
+            radius: 3.0.into(),
+        },
         text_color: Some(Color::WHITE),
     }
 }
