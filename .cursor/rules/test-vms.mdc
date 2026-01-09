@@ -23,13 +23,13 @@ ssh vboxuser@localhost -p 2225
 
 When user says "copy to vm X" or similar, copy the debug binary to the specified VM:
 
-**Source:** `target/debug/grars` (build with `cargo build` if needed)
+**Source:** `target/debug/insight-reader` (build with `cargo build` if needed)
 
-**Destination:** `~/.local/bin/grars` on all VMs
+**Destination:** `~/.local/bin/insight-reader` on all VMs
 
 **Process:**
 1. Build debug binary: `cargo build` (if not already built)
-2. SCP to VM: `scp -P <PORT> target/debug/grars vboxuser@localhost:/tmp/grars`
-3. SSH and replace: `ssh -p <PORT> vboxuser@localhost "cp /tmp/grars ~/.local/bin/grars && chmod +x ~/.local/bin/grars"`
+2. SCP to VM: `scp -P <PORT> target/debug/insight-reader vboxuser@localhost:/tmp/insight-reader`
+3. SSH and replace: `ssh -p <PORT> vboxuser@localhost "cp /tmp/insight-reader ~/.local/bin/insight-reader && chmod +x ~/.local/bin/insight-reader"`
 
 

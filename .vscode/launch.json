@@ -1,33 +1,33 @@
 {
     "version": "0.2.0",
     "configurations": [
-        // Debug grars (F5 default) — Use for normal debugging.
+        // Debug insight-reader (F5 default) — Use for normal debugging.
         // Variables, stack traces, and stepping work as expected.
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug grars",
+            "name": "Debug insight-reader",
             "cargo": {
-                "args": ["build", "--bin=grars", "--package=grars"],
+                "args": ["build", "--bin=insight-reader", "--package=insight-reader"],
                 "filter": {
-                    "name": "grars",
+                    "name": "insight-reader",
                     "kind": "bin"
                 }
             },
             "args": [],
             "cwd": "${workspaceFolder}"
         },
-        // Debug grars (release) — Use when debugging performance issues or bugs
+        // Debug insight-reader (release) — Use when debugging performance issues or bugs
         // that only appear in release builds. Note: the optimizer may inline
         // functions and eliminate variables, making debugging harder.
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug grars (release)",
+            "name": "Debug insight-reader (release)",
             "cargo": {
-                "args": ["build", "--release", "--bin=grars", "--package=grars"],
+                "args": ["build", "--release", "--bin=insight-reader", "--package=insight-reader"],
                 "filter": {
-                    "name": "grars",
+                    "name": "insight-reader",
                     "kind": "bin"
                 }
             },
