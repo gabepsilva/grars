@@ -1,82 +1,325 @@
 #!/bin/bash
-# Detect OS and call appropriate uninstaller
-# This script downloads required uninstall scripts from GitHub if they don't exist locally
+# Self-contained uninstall script for grars
+# Removes the grars binary, virtual environment, models, and platform-specific files
 
 set -euo pipefail
 
-OS=$(uname -s)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GITHUB_REPO="${GITHUB_REPO:-gabepsilva/grars}"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Use cache directory for downloaded scripts (or local install directory if in repo)
-if [ -d "$SCRIPT_DIR/install" ] && [ -f "$SCRIPT_DIR/install/common-bash.sh" ]; then
-    # We're in the repository, use local scripts
-    INSTALL_DIR="$SCRIPT_DIR/install"
-else
-    # Download to cache directory
-    INSTALL_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/grars-install"
-    mkdir -p "$INSTALL_DIR"
-fi
-
-# Function to download file from GitHub
-download_file() {
-    local url="$1"
-    local output="$2"
-    
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL -o "$output" "$url"
-    elif command -v wget >/dev/null 2>&1; then
-        wget -q -O "$output" "$url"
-    else
-        return 1
-    fi
+# Logging functions
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-# Ensure install directory exists (already created above if using cache)
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
 
-# Download required scripts from GitHub if they don't exist locally
-GITHUB_BASE="https://raw.githubusercontent.com/$GITHUB_REPO/master/install"
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
 
-# Check and download common-bash.sh
-if [ ! -f "$INSTALL_DIR/common-bash.sh" ]; then
-    echo "Downloading common-bash.sh from GitHub..."
-    if ! download_file "$GITHUB_BASE/common-bash.sh" "$INSTALL_DIR/common-bash.sh"; then
-        echo "Error: Failed to download common-bash.sh from GitHub"
-        exit 1
-    fi
-    chmod +x "$INSTALL_DIR/common-bash.sh"
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Installation directories (XDG Base Directory standard)
+INSTALL_DIR="$HOME/.local/share/grars"
+BIN_DIR="$HOME/.local/bin"
+VENV_DIR="$INSTALL_DIR/venv"
+MODELS_DIR="$INSTALL_DIR/models"
+GRARS_BIN="$BIN_DIR/grars"
+
+# Platform-specific paths
+OS=$(uname -s)
+if [ "$OS" = "Darwin" ]; then
+    APP_BUNDLE="/Applications/grars.app"
+    DESKTOP_FILE=""
+    ICON_FILE=""
+else
+    APP_BUNDLE=""
+    DESKTOP_FILE="$HOME/.local/share/applications/grars.desktop"
+    ICON_FILE="$HOME/.local/share/icons/hicolor/scalable/apps/grars.svg"
 fi
 
-# Check and download platform-specific uninstall script
-case "$OS" in
-    Linux)
-        if [ ! -f "$INSTALL_DIR/uninstall-linux.sh" ]; then
-            echo "Downloading uninstall-linux.sh from GitHub..."
-            if ! download_file "$GITHUB_BASE/uninstall-linux.sh" "$INSTALL_DIR/uninstall-linux.sh"; then
-                echo "Error: Failed to download uninstall-linux.sh from GitHub"
-                exit 1
-            fi
-            chmod +x "$INSTALL_DIR/uninstall-linux.sh"
-        fi
-        exec "$INSTALL_DIR/uninstall-linux.sh" "$@"
-        ;;
-    Darwin)
-        if [ ! -f "$INSTALL_DIR/uninstall-macos.sh" ]; then
-            echo "Downloading uninstall-macos.sh from GitHub..."
-            if ! download_file "$GITHUB_BASE/uninstall-macos.sh" "$INSTALL_DIR/uninstall-macos.sh"; then
-                echo "Error: Failed to download uninstall-macos.sh from GitHub"
-                exit 1
-            fi
-            chmod +x "$INSTALL_DIR/uninstall-macos.sh"
-        fi
-        exec "$INSTALL_DIR/uninstall-macos.sh" "$@"
-        ;;
-    *)
-        echo "Unsupported OS: $OS"
-        echo "Please use the appropriate uninstaller script directly:"
-        echo "  - Linux: install/uninstall-linux.sh"
-        echo "  - macOS: install/uninstall-macos.sh"
-        exit 1
-        ;;
-esac
+CONFIG_FILE="$HOME/.config/grars/config.json"
+CONFIG_DIR="$HOME/.config/grars"
+LOG_DIR="$HOME/.local/share/grars/logs"
 
+# Parse arguments
+FORCE_PROJECT_ROOT=false
+FORCE_USER_DIR=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --project-root)
+            FORCE_PROJECT_ROOT=true
+            ;;
+        --user)
+            FORCE_USER_DIR=true
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --project-root Force removal from project root only"
+            echo "  --user        Force removal from user directory only"
+            echo "  --help, -h    Show this help message"
+            echo ""
+            echo "If no location is specified, auto-detects based on current directory."
+            echo "Note: Models are always removed along with the venv."
+            exit 0
+            ;;
+        *)
+            log_error "Unknown option: $arg"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Determine which locations to clean
+PROJECT_ROOT_DIR="$(pwd)"
+PROJECT_VENV="$PROJECT_ROOT_DIR/venv"
+PROJECT_MODELS="$PROJECT_ROOT_DIR/models"
+USER_DIR="$INSTALL_DIR"
+USER_VENV="$VENV_DIR"
+USER_MODELS="$MODELS_DIR"
+
+CLEAN_PROJECT=false
+CLEAN_USER=false
+
+if [ "$FORCE_PROJECT_ROOT" = true ]; then
+    CLEAN_PROJECT=true
+elif [ "$FORCE_USER_DIR" = true ]; then
+    CLEAN_USER=true
+else
+    # Auto-detect: check if we're in project root
+    if [ -f "$PROJECT_ROOT_DIR/Cargo.toml" ] && [ -d "$PROJECT_ROOT_DIR/src" ]; then
+        CLEAN_PROJECT=true
+        log_info "Detected project root, will clean: $PROJECT_ROOT_DIR"
+    fi
+    
+    # Always check user directory too (might have both)
+    if [ -d "$USER_DIR" ]; then
+        CLEAN_USER=true
+        log_info "Found user installation, will clean: $USER_DIR"
+    fi
+fi
+
+# If nothing detected, ask user
+if [ "$CLEAN_PROJECT" = false ] && [ "$CLEAN_USER" = false ]; then
+    log_warn "No installation detected in current location or user directory."
+    log_info "Checking common locations..."
+    
+    if [ -d "$PROJECT_VENV" ] || [ -d "$PROJECT_MODELS" ]; then
+        CLEAN_PROJECT=true
+        log_info "Found installation in project root"
+    fi
+    
+    if [ -d "$USER_VENV" ] || [ -d "$USER_MODELS" ]; then
+        CLEAN_USER=true
+        log_info "Found installation in user directory"
+    fi
+    
+    if [ "$CLEAN_PROJECT" = false ] && [ "$CLEAN_USER" = false ]; then
+        log_error "No grars installation found to remove."
+        exit 1
+    fi
+fi
+
+# Show what will be removed
+echo "=========================================="
+if [ "$OS" = "Darwin" ]; then
+    echo "  grars Uninstall Script (macOS)"
+else
+    echo "  grars Uninstall Script (Linux)"
+fi
+echo "=========================================="
+echo ""
+
+ITEMS_TO_REMOVE=()
+
+if [ "$CLEAN_PROJECT" = true ]; then
+    if [ -d "$PROJECT_VENV" ]; then
+        ITEMS_TO_REMOVE+=("Project venv: $PROJECT_VENV")
+    fi
+    if [ -d "$PROJECT_MODELS" ]; then
+        ITEMS_TO_REMOVE+=("Project models: $PROJECT_MODELS")
+    fi
+fi
+
+if [ "$CLEAN_USER" = true ]; then
+    if [ -d "$USER_VENV" ]; then
+        ITEMS_TO_REMOVE+=("User venv: $USER_VENV")
+    fi
+    if [ -d "$USER_MODELS" ]; then
+        ITEMS_TO_REMOVE+=("User models: $USER_MODELS")
+    fi
+    if [ -f "$GRARS_BIN" ]; then
+        ITEMS_TO_REMOVE+=("grars binary: $GRARS_BIN")
+    fi
+    if [ -n "$APP_BUNDLE" ] && [ -d "$APP_BUNDLE" ]; then
+        ITEMS_TO_REMOVE+=("App bundle: $APP_BUNDLE")
+    fi
+    if [ -n "$DESKTOP_FILE" ] && [ -f "$DESKTOP_FILE" ]; then
+        ITEMS_TO_REMOVE+=("Desktop file: $DESKTOP_FILE")
+    fi
+    if [ -n "$ICON_FILE" ] && [ -f "$ICON_FILE" ]; then
+        ITEMS_TO_REMOVE+=("Icon: $ICON_FILE")
+    fi
+    if [ -f "$CONFIG_FILE" ]; then
+        ITEMS_TO_REMOVE+=("Config file: $CONFIG_FILE")
+    fi
+    if [ -d "$LOG_DIR" ]; then
+        ITEMS_TO_REMOVE+=("Log directory: $LOG_DIR")
+    fi
+fi
+
+if [ ${#ITEMS_TO_REMOVE[@]} -eq 0 ]; then
+    log_warn "Nothing to remove (no matching directories found)"
+    exit 0
+fi
+
+log_info "The following will be removed:"
+for item in "${ITEMS_TO_REMOVE[@]}"; do
+    echo "  - $item"
+done
+
+echo ""
+read -p "Continue with removal? [y/N] " -n 1 -r
+echo ""
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    log_info "Cancelled"
+    exit 0
+fi
+
+# Remove project root installation
+if [ "$CLEAN_PROJECT" = true ]; then
+    if [ -d "$PROJECT_VENV" ]; then
+        log_info "Removing project venv: $PROJECT_VENV"
+        rm -rf "$PROJECT_VENV"
+        log_success "Removed project venv"
+    else
+        log_info "Project venv not found: $PROJECT_VENV"
+    fi
+    
+    if [ -d "$PROJECT_MODELS" ]; then
+        log_info "Removing project models: $PROJECT_MODELS"
+        rm -rf "$PROJECT_MODELS"
+        log_success "Removed project models"
+    fi
+fi
+
+# Remove user directory installation
+if [ "$CLEAN_USER" = true ]; then
+    if [ -d "$USER_VENV" ]; then
+        log_info "Removing user venv: $USER_VENV"
+        rm -rf "$USER_VENV"
+        log_success "Removed user venv"
+    else
+        log_info "User venv not found: $USER_VENV"
+    fi
+    
+    if [ -d "$USER_MODELS" ]; then
+        log_info "Removing user models: $USER_MODELS"
+        rm -rf "$USER_MODELS"
+        log_success "Removed user models"
+    fi
+    
+    # Remove grars binary
+    if [ -f "$GRARS_BIN" ]; then
+        log_info "Removing grars binary: $GRARS_BIN"
+        rm -f "$GRARS_BIN"
+        log_success "Removed grars binary"
+    fi
+    
+    # Remove app bundle (macOS-specific)
+    if [ -n "$APP_BUNDLE" ] && [ -d "$APP_BUNDLE" ]; then
+        log_info "Removing app bundle: $APP_BUNDLE"
+        rm -rf "$APP_BUNDLE"
+        log_success "Removed app bundle"
+    fi
+    
+    # Remove desktop file (Linux-specific)
+    if [ -n "$DESKTOP_FILE" ] && [ -f "$DESKTOP_FILE" ]; then
+        log_info "Removing desktop file: $DESKTOP_FILE"
+        rm -f "$DESKTOP_FILE"
+        log_success "Removed desktop file"
+        
+        # Update desktop database if available
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+            log_info "Desktop database updated"
+        fi
+        # KDE uses kbuildsycoca
+        if command -v kbuildsycoca6 >/dev/null 2>&1; then
+            kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+            log_info "KDE 6 application database updated"
+        elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+            kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
+            log_info "KDE 5 application database updated"
+        fi
+    fi
+    
+    # Remove icon (Linux-specific)
+    if [ -n "$ICON_FILE" ] && [ -f "$ICON_FILE" ]; then
+        log_info "Removing icon: $ICON_FILE"
+        rm -f "$ICON_FILE"
+        log_success "Removed icon"
+        
+        # Update icon cache if available
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+            log_info "Icon cache updated"
+        fi
+        # KDE uses kbuildsycoca for icons too
+        if command -v kbuildsycoca6 >/dev/null 2>&1; then
+            kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+        elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+            kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
+        fi
+    fi
+    
+    # Remove config file
+    if [ -f "$CONFIG_FILE" ]; then
+        log_info "Removing config file: $CONFIG_FILE"
+        rm -f "$CONFIG_FILE"
+        log_success "Removed config file"
+    fi
+    
+    # Remove config directory if it's empty
+    if [ -d "$CONFIG_DIR" ]; then
+        if [ -z "$(ls -A "$CONFIG_DIR" 2>/dev/null)" ]; then
+            log_info "Removing empty config directory: $CONFIG_DIR"
+            rmdir "$CONFIG_DIR"
+            log_success "Removed empty config directory"
+        fi
+    fi
+    
+    # Remove log directory
+    if [ -d "$LOG_DIR" ]; then
+        log_info "Removing log directory: $LOG_DIR"
+        rm -rf "$LOG_DIR"
+        log_success "Removed log directory"
+    fi
+    
+    # Remove user directory if it's empty
+    if [ -d "$USER_DIR" ]; then
+        if [ -z "$(ls -A "$USER_DIR" 2>/dev/null)" ]; then
+            log_info "Removing empty user directory: $USER_DIR"
+            rmdir "$USER_DIR"
+            log_success "Removed empty user directory"
+        fi
+    fi
+fi
+
+echo ""
+log_success "Uninstall complete!"
+echo ""
+log_info "You can now run ./install.sh to reinstall."

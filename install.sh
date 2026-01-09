@@ -5,7 +5,13 @@
 set -euo pipefail
 
 OS=$(uname -s)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Handle case where script is piped from curl (BASH_SOURCE[0] may be unbound)
+if [ -n "${BASH_SOURCE[0]:-}" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    # Script is being piped, use current directory or home directory
+    SCRIPT_DIR="${PWD:-$HOME}"
+fi
 GITHUB_REPO="${GITHUB_REPO:-gabepsilva/grars}"
 
 # Use cache directory for downloaded scripts (or local install directory if in repo)
