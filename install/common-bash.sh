@@ -298,11 +298,14 @@ download_and_install_binary() {
     detect_os
     detect_arch
     
-    # Construct binary name: insight-reader-1.0.0-linux-x86_64 or insight-reader-1.0.0-macos-aarch64
-    BINARY_NAME="insight-reader-${INSIGHT_READER_VERSION}-${OS}-${ARCH}"
+    # Get latest release tag
+    get_latest_release
     
-    # Use specific release tag for v1.0.0, or allow override via RELEASE_TAG env var
-    RELEASE_TAG="${RELEASE_TAG:-v1.0.0}"
+    # Construct binary name: grars-linux-x86_64 or grars-macos-aarch64 (no version in filename)
+    BINARY_NAME="grars-${OS}-${ARCH}"
+    
+    # Use latest release tag, or allow override via RELEASE_TAG env var
+    RELEASE_TAG="${RELEASE_TAG:-$LATEST_RELEASE}"
     DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$RELEASE_TAG/$BINARY_NAME"
     
     # Download binary
