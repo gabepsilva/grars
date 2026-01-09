@@ -62,6 +62,7 @@ LOG_DIR="$HOME/.local/share/grars/logs"
 # Parse arguments
 FORCE_PROJECT_ROOT=false
 FORCE_USER_DIR=false
+AUTO_CONFIRM=false
 
 for arg in "$@"; do
     case "$arg" in
@@ -71,16 +72,23 @@ for arg in "$@"; do
         --user)
             FORCE_USER_DIR=true
             ;;
+        --yes|-y)
+            AUTO_CONFIRM=true
+            ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --project-root Force removal from project root only"
             echo "  --user        Force removal from user directory only"
+            echo "  --yes, -y     Skip confirmation prompt (for non-interactive use)"
             echo "  --help, -h    Show this help message"
             echo ""
             echo "If no location is specified, auto-detects based on current directory."
             echo "Note: Models are always removed along with the venv."
+            echo ""
+            echo "Non-interactive usage (e.g., with curl):"
+            echo "  curl -fsSL URL | bash -s -- --yes"
             exit 0
             ;;
         *)
@@ -200,11 +208,30 @@ for item in "${ITEMS_TO_REMOVE[@]}"; do
 done
 
 echo ""
-read -p "Continue with removal? [y/N] " -n 1 -r
-echo ""
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    log_info "Cancelled"
-    exit 0
+if [ "$AUTO_CONFIRM" = true ]; then
+    log_info "Auto-confirming removal (--yes flag)"
+else
+    # When script is piped (e.g., curl ... | bash), stdin is the script itself.
+    # We need to read from /dev/tty (the terminal) for user input.
+    if [ -t 0 ]; then
+        # stdin is a terminal, read normally
+        read -p "Continue with removal? [y/N] " -n 1 -r
+        echo ""
+    elif [ -e /dev/tty ]; then
+        # stdin is not a terminal (piped), try reading from /dev/tty
+        echo -n "Continue with removal? [y/N] "
+        read -n 1 -r REPLY </dev/tty
+        echo ""
+    else
+        log_error "Cannot read user input (no terminal available)"
+        log_info "Use --yes flag for non-interactive mode:"
+        log_info "  curl -fsSL URL | bash -s -- --yes"
+        exit 1
+    fi
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Cancelled"
+        exit 0
+    fi
 fi
 
 # Remove project root installation
