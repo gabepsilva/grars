@@ -50,13 +50,13 @@ While it should work on other Linux distributions and window managers, these are
 Run the installation script directly from GitHub:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gabepsilva/grars/master/install.sh | bash
+curl -fsSL https://insightreader.xyz/install.sh | bash
 ```
 
 Or using `wget`:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/gabepsilva/grars/master/install.sh | bash
+wget -qO- https://insightreader.xyz/install.sh | bash
 ```
 
 ### Manual Installation

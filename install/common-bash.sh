@@ -1,4 +1,4 @@
-# Common functions and variables for grars installation scripts
+# Common functions and variables for insight-reader installation scripts
 # This file is sourced by platform-specific install scripts
 
 # Colors for output
@@ -26,16 +26,16 @@ log_error() {
 }
 
 # Installation directories (XDG Base Directory standard)
-INSTALL_DIR="$HOME/.local/share/grars"
+INSTALL_DIR="$HOME/.local/share/insight-reader"
 BIN_DIR="$HOME/.local/bin"
 VENV_DIR="$INSTALL_DIR/venv"
 MODELS_DIR="$INSTALL_DIR/models"
-GRARS_BIN="$BIN_DIR/grars"
+INSIGHT_READER_BIN="$BIN_DIR/insight-reader"
 
 # GitHub repository
-GITHUB_REPO="${GITHUB_REPO:-gabepsilva/grars}"
+GITHUB_REPO="${GITHUB_REPO:-gabepsilva/insight-reader}"
 GITHUB_API="https://api.github.com/repos/$GITHUB_REPO"
-GRARS_VERSION="${GRARS_VERSION:-1.0.0}"
+INSIGHT_READER_VERSION="${INSIGHT_READER_VERSION:-1.0.0}"
 
 # Model to download (default)
 # Note: Models are downloaded from HuggingFace main branch (always latest)
@@ -287,9 +287,9 @@ get_latest_release() {
     fi
 }
 
-# Download and install grars binary from GitHub
+# Download and install insight-reader binary from GitHub
 download_and_install_binary() {
-    log_info "Downloading grars binary from GitHub..."
+    log_info "Downloading insight-reader binary from GitHub..."
     
     # Ensure bin directory exists
     mkdir -p "$BIN_DIR"
@@ -298,17 +298,17 @@ download_and_install_binary() {
     detect_os
     detect_arch
     
-    # Construct binary name: grars-1.0.0-linux-x86_64 or grars-1.0.0-macos-aarch64
-    BINARY_NAME="grars-${GRARS_VERSION}-${OS}-${ARCH}"
+    # Construct binary name: insight-reader-1.0.0-linux-x86_64 or insight-reader-1.0.0-macos-aarch64
+    BINARY_NAME="insight-reader-${INSIGHT_READER_VERSION}-${OS}-${ARCH}"
     
     # Use specific release tag for v1.0.0, or allow override via RELEASE_TAG env var
     RELEASE_TAG="${RELEASE_TAG:-v1.0.0}"
     DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$RELEASE_TAG/$BINARY_NAME"
     
     # Download binary
-    if download_file "$DOWNLOAD_URL" "$GRARS_BIN"; then
-        chmod +x "$GRARS_BIN"
-        log_success "Binary downloaded and installed to $GRARS_BIN"
+    if download_file "$DOWNLOAD_URL" "$INSIGHT_READER_BIN"; then
+        chmod +x "$INSIGHT_READER_BIN"
+        log_success "Binary downloaded and installed to $INSIGHT_READER_BIN"
         return 0
     else
         if ! command_exists curl && ! command_exists wget; then
@@ -320,9 +320,9 @@ download_and_install_binary() {
     fi
 }
 
-# Install grars binary (try local first, then download from GitHub)
+# Install insight-reader binary (try local first, then download from GitHub)
 install_binary() {
-    log_info "Installing grars binary..."
+    log_info "Installing insight-reader binary..."
     
     # Ensure bin directory exists
     mkdir -p "$BIN_DIR"
@@ -332,33 +332,33 @@ install_binary() {
     local local_binary_full=""
     
     # Check if we're in the project directory
-    if [ -f "Cargo.toml" ] && [ -d "target/release" ] && [ -f "target/release/grars" ]; then
-        local_binary="target/release/grars"
+    if [ -f "Cargo.toml" ] && [ -d "target/release" ] && [ -f "target/release/insight-reader" ]; then
+        local_binary="target/release/insight-reader"
         # Get full absolute path
         if command_exists realpath; then
             local_binary_full=$(realpath "$local_binary")
         else
             local_binary_full="$(cd "$(dirname "$local_binary")" && pwd)/$(basename "$local_binary")"
         fi
-        log_info "Found local build in target/release/grars"
+        log_info "Found local build in target/release/insight-reader"
     # Also check current directory
-    elif [ -f "grars" ] && [ -x "grars" ]; then
-        local_binary="grars"
+    elif [ -f "insight-reader" ] && [ -x "insight-reader" ]; then
+        local_binary="insight-reader"
         # Get full absolute path
         if command_exists realpath; then
             local_binary_full=$(realpath "$local_binary")
         else
             local_binary_full="$(cd "$(dirname "$local_binary")" && pwd)/$(basename "$local_binary")"
         fi
-        log_info "Found grars binary in current directory"
+        log_info "Found insight-reader binary in current directory"
     fi
     
     # If local binary found, copy it
     if [ -n "$local_binary" ]; then
-        log_info "Copying binary from $local_binary_full to $GRARS_BIN"
-        cp "$local_binary" "$GRARS_BIN"
-        chmod +x "$GRARS_BIN"
-        log_success "Binary copied and installed to $GRARS_BIN"
+        log_info "Copying binary from $local_binary_full to $INSIGHT_READER_BIN"
+        cp "$local_binary" "$INSIGHT_READER_BIN"
+        chmod +x "$INSIGHT_READER_BIN"
+        log_success "Binary copied and installed to $INSIGHT_READER_BIN"
         return 0
     fi
     
@@ -371,7 +371,7 @@ install_binary() {
     # Both methods failed
     log_error "Failed to install binary"
     log_info "Please build the binary first: cargo build --release"
-    log_info "Or place a grars binary in the current directory"
+    log_info "Or place an insight-reader binary in the current directory"
     return 1
 }
 

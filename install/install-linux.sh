@@ -266,15 +266,15 @@ check_and_install_dependencies() {
 install_desktop() {
     DESKTOP_DIR="$HOME/.local/share/applications"
     ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
-    DESKTOP_FILE="$DESKTOP_DIR/grars.desktop"
-    ICON_FILE="$ICON_DIR/grars.svg"
+    DESKTOP_FILE="$DESKTOP_DIR/insight-reader.desktop"
+    ICON_FILE="$ICON_DIR/insight-reader.svg"
     
     # Create directories
     mkdir -p "$DESKTOP_DIR"
     mkdir -p "$ICON_DIR"
     
     # GitHub URLs for desktop file and icon
-    DESKTOP_URL="https://raw.githubusercontent.com/$GITHUB_REPO/master/install/grars.desktop"
+    DESKTOP_URL="https://raw.githubusercontent.com/$GITHUB_REPO/master/install/insight-reader.desktop"
     ICON_URL="https://raw.githubusercontent.com/$GITHUB_REPO/master/assets/logo.svg"
     
     # Download desktop file from GitHub
@@ -334,7 +334,7 @@ install_desktop() {
 # Main installation function
 main() {
     echo "=========================================="
-    echo "  grars Installation Script"
+    echo "  Insight Reader Installation Script"
     echo "=========================================="
     echo ""
     
@@ -355,7 +355,7 @@ main() {
     echo ""
     log_success "Installation complete!"
     echo ""
-    echo "grars binary: $GRARS_BIN"
+    echo "insight-reader binary: $INSIGHT_READER_BIN"
     echo "Piper venv: $VENV_DIR/bin/piper"
     echo "Models directory: $MODELS_DIR"
     echo ""
@@ -365,7 +365,7 @@ main() {
         echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
         echo ""
     fi
-    echo "Run grars with: grars"
+    echo "Run insight-reader with: insight-reader"
     echo ""
 }
 

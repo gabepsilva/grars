@@ -12,7 +12,7 @@ else
     # Script is being piped, use current directory or home directory
     SCRIPT_DIR="${PWD:-$HOME}"
 fi
-GITHUB_REPO="${GITHUB_REPO:-gabepsilva/grars}"
+GITHUB_REPO="${GITHUB_REPO:-gabepsilva/insight-reader}"
 
 # Use cache directory for downloaded scripts (or local install directory if in repo)
 if [ -d "$SCRIPT_DIR/install" ] && [ -f "$SCRIPT_DIR/install/common-bash.sh" ]; then
@@ -20,7 +20,7 @@ if [ -d "$SCRIPT_DIR/install" ] && [ -f "$SCRIPT_DIR/install/common-bash.sh" ]; 
     INSTALL_DIR="$SCRIPT_DIR/install"
 else
     # Download to cache directory
-    INSTALL_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/grars-install"
+    INSTALL_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/insight-reader-install"
     mkdir -p "$INSTALL_DIR"
 fi
 

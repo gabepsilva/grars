@@ -213,7 +213,7 @@ create_app_bundle() {
     log_info "Creating macOS app bundle..."
     
     # App bundle paths
-    APP_NAME="grars.app"
+    APP_NAME="insight-reader.app"
     APP_DIR="/Applications/$APP_NAME"
     APP_CONTENTS="$APP_DIR/Contents"
     APP_MACOS="$APP_CONTENTS/MacOS"
@@ -223,7 +223,7 @@ create_app_bundle() {
     log_info "Downloading logo from GitHub..."
     local temp_logo
     temp_logo=$(mktemp)
-    ICON_URL="https://raw.githubusercontent.com/$GITHUB_REPO/master/assets/logo.png"
+    ICON_URL="https://raw.githubusercontent.com/$GITHUB_REPO/master/assets/logo.svg"
     if download_file "$ICON_URL" "$temp_logo"; then
         LOGO_FILE="$temp_logo"
         log_success "Logo downloaded from GitHub"
@@ -244,14 +244,14 @@ create_app_bundle() {
     mkdir -p "$APP_RESOURCES"
     
     # Copy binary to app bundle
-    if [ ! -f "$GRARS_BIN" ]; then
-        log_error "Binary not found at $GRARS_BIN"
+    if [ ! -f "$INSIGHT_READER_BIN" ]; then
+        log_error "Binary not found at $INSIGHT_READER_BIN"
         log_error "Please run install_binary first"
         return 1
     fi
     
     log_info "Creating symlink to binary in app bundle..."
-    ln -s "$GRARS_BIN" "$APP_MACOS/grars"
+    ln -s "$INSIGHT_READER_BIN" "$APP_MACOS/insight-reader"
     
     # Convert PNG logo to ICNS for macOS icon
     if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
@@ -260,13 +260,10 @@ create_app_bundle() {
         # Create temporary directory for icon conversion
         ICON_TEMP_DIR=$(mktemp -d)
         ICON_PNG="$ICON_TEMP_DIR/icon.png"
-        ICON_ICNS="$APP_RESOURCES/grars.icns"
-        
-        # Copy PNG to temp directory
-        cp "$LOGO_FILE" "$ICON_PNG"
+        ICON_ICNS="$APP_RESOURCES/insight-reader.icns"
         
         # Create iconset directory structure
-        ICONSET_DIR="$ICON_TEMP_DIR/grars.iconset"
+        ICONSET_DIR="$ICON_TEMP_DIR/insight-reader.iconset"
         mkdir -p "$ICONSET_DIR"
         
         # Generate different sizes (required for ICNS)
@@ -274,12 +271,38 @@ create_app_bundle() {
         if command_exists sips; then
             log_info "Creating iconset with multiple sizes..."
             
+            # Detect file type and convert SVG to PNG if needed
+            # sips can work with SVG directly on macOS 10.14+, but we'll try conversion first for compatibility
+            local source_file="$LOGO_FILE"
+            local file_type
+            file_type=$(file -b --mime-type "$LOGO_FILE" 2>/dev/null || echo "")
+            
+            if [[ "$file_type" == "image/svg+xml" ]] || [[ "$ICON_URL" == *.svg ]]; then
+                # Try to convert SVG to PNG first for better compatibility
+                if command_exists rsvg-convert; then
+                    rsvg-convert -w 512 -h 512 "$LOGO_FILE" -o "$ICON_PNG" 2>/dev/null && source_file="$ICON_PNG" || source_file="$LOGO_FILE"
+                elif command_exists qlmanage; then
+                    # Use qlmanage to convert SVG to PNG (macOS built-in)
+                    qlmanage -t -s 512 -o "$ICON_TEMP_DIR" "$LOGO_FILE" >/dev/null 2>&1
+                    local converted_png
+                    converted_png=$(find "$ICON_TEMP_DIR" -name "*.png" -type f | head -1)
+                    if [ -n "$converted_png" ] && [ -f "$converted_png" ]; then
+                        mv "$converted_png" "$ICON_PNG"
+                        source_file="$ICON_PNG"
+                    fi
+                fi
+            else
+                # Not SVG, copy to PNG path for consistency
+                cp "$LOGO_FILE" "$ICON_PNG"
+                source_file="$ICON_PNG"
+            fi
+            
             for size in 16 32 128 256 512; do
-                # Create @1x version
-                sips -z "$size" "$size" "$ICON_PNG" --out "$ICONSET_DIR/icon_${size}x${size}.png" >/dev/null 2>&1 || true
+                # Create @1x version (sips can handle SVG directly on newer macOS)
+                sips -z "$size" "$size" "$source_file" --out "$ICONSET_DIR/icon_${size}x${size}.png" >/dev/null 2>&1 || true
                 # Create @2x version
                 local size2x=$((size * 2))
-                sips -z "$size2x" "$size2x" "$ICON_PNG" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" >/dev/null 2>&1 || true
+                sips -z "$size2x" "$size2x" "$source_file" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" >/dev/null 2>&1 || true
             done
             
             # Check if iconset has required files
@@ -293,20 +316,20 @@ create_app_bundle() {
                 else
                     # Fallback: use PNG directly (copy 512x512 version)
                     if [ -f "$ICONSET_DIR/icon_512x512.png" ]; then
-                        cp "$ICONSET_DIR/icon_512x512.png" "$APP_RESOURCES/grars.png"
+                        cp "$ICONSET_DIR/icon_512x512.png" "$APP_RESOURCES/insight-reader.png"
                     else
-                        cp "$ICON_PNG" "$APP_RESOURCES/grars.png"
+                        cp "$ICON_PNG" "$APP_RESOURCES/insight-reader.png"
                     fi
                     log_info "Using PNG icon (ICNS conversion failed, but PNG will work)"
                 fi
             else
                 # Not enough icons or no iconutil, use PNG directly
-                cp "$ICON_PNG" "$APP_RESOURCES/grars.png"
+                cp "$ICON_PNG" "$APP_RESOURCES/insight-reader.png"
                 log_info "Using PNG icon (iconset incomplete: $iconset_count files)"
             fi
         else
             # No sips, just copy the PNG
-            cp "$ICON_PNG" "$APP_RESOURCES/grars.png"
+            cp "$ICON_PNG" "$APP_RESOURCES/insight-reader.png"
             log_info "Using PNG icon (sips not available for resizing)"
         fi
         
@@ -328,23 +351,23 @@ create_app_bundle() {
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>grars</string>
+    <string>insight-reader</string>
     <key>CFBundleIconFile</key>
-    <string>grars</string>
+    <string>insight-reader</string>
     <key>CFBundleIdentifier</key>
-    <string>com.grars.app</string>
+    <string>com.insight-reader.app</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>grars</string>
+    <string>Insight Reader</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>${GRARS_VERSION}</string>
+    <string>${INSIGHT_READER_VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>${GRARS_VERSION}</string>
+    <string>${INSIGHT_READER_VERSION}</string>
     <key>CFBundleGetInfoString</key>
-    <string>Graphical Reader Assistant - Text-to-Speech application</string>
+    <string>Insight Reader - Text-to-Speech application</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.13</string>
     <key>NSHighResolutionCapable</key>
@@ -356,13 +379,13 @@ create_app_bundle() {
 EOF
     
     log_success "App bundle created at $APP_DIR"
-    log_info "You can now launch grars from Applications or Spotlight"
+    log_info "You can now launch Insight Reader from Applications or Spotlight"
 }
 
 # Main installation function
 main() {
     echo "=========================================="
-    echo "  grars Installation Script (macOS)"
+    echo "  Insight Reader Installation Script (macOS)"
     echo "=========================================="
     echo ""
     
@@ -383,8 +406,8 @@ main() {
     echo ""
     log_success "Installation complete!"
     echo ""
-    echo "grars binary: $GRARS_BIN"
-    echo "App bundle: /Applications/grars.app"
+    echo "insight-reader binary: $INSIGHT_READER_BIN"
+    echo "App bundle: /Applications/insight-reader.app"
     echo "Piper venv: $VENV_DIR/bin/piper"
     echo "Models directory: $MODELS_DIR"
     echo ""
@@ -394,8 +417,8 @@ main() {
         echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
         echo ""
     fi
-    echo "Run grars with: grars"
-    echo "Or launch from: /Applications/grars.app"
+    echo "Run insight-reader with: insight-reader"
+    echo "Or launch from: /Applications/insight-reader.app"
     echo ""
 }
 

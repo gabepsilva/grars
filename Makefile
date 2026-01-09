@@ -3,7 +3,6 @@
 # Creates versioned artifacts: grars-1.0.0-linux-x86_64, grars-1.0.0-macos-aarch64, etc.
 # Also creates a symlink 'grars' pointing to the versioned binary
 
-VERSION := 1.0.0
 BINARY_NAME := grars
 RELEASE_DIR := target/release
 BUILD_DIR := build
@@ -57,8 +56,8 @@ else
 endif
 
 # Build artifact name with version and platform
-# Example: grars-1.0.0-linux-x86_64
-ARTIFACT_NAME := $(BINARY_NAME)-$(VERSION)-$(OS)-$(ARCH)
+# Example: grars-linux-x86_64
+ARTIFACT_NAME := $(BINARY_NAME)-$(OS)-$(ARCH)
 ARTIFACT_PATH := $(BUILD_DIR)/$(ARTIFACT_NAME)
 SYMLINK_PATH := $(BUILD_DIR)/$(BINARY_NAME)
 
@@ -91,8 +90,6 @@ build:
 		cp $(RELEASE_DIR)/$(BINARY_NAME) $(ARTIFACT_PATH); \
 	fi
 	@chmod +x $(ARTIFACT_PATH)
-	@echo "Creating symlink $(BINARY_NAME) -> $(ARTIFACT_NAME)..."
-	@cd $(BUILD_DIR) && ln -sf $(ARTIFACT_NAME) $(BINARY_NAME)
 	@echo "✓ Built: $(ARTIFACT_PATH)"
 
 # Create symlink to versioned binary (legacy target, now handled in build)

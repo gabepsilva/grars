@@ -1,6 +1,6 @@
 #!/bin/bash
-# Self-contained uninstall script for grars
-# Removes the grars binary, virtual environment, models, and platform-specific files
+# Self-contained uninstall script for insight-reader
+# Removes the insight-reader binary, virtual environment, models, and platform-specific files
 
 # Temporarily disable unbound variable checking to safely check BASH_SOURCE
 set +u
@@ -37,27 +37,27 @@ log_error() {
 }
 
 # Installation directories (XDG Base Directory standard)
-INSTALL_DIR="$HOME/.local/share/grars"
+INSTALL_DIR="$HOME/.local/share/insight-reader"
 BIN_DIR="$HOME/.local/bin"
 VENV_DIR="$INSTALL_DIR/venv"
 MODELS_DIR="$INSTALL_DIR/models"
-GRARS_BIN="$BIN_DIR/grars"
+INSIGHT_READER_BIN="$BIN_DIR/insight-reader"
 
 # Platform-specific paths
 OS=$(uname -s)
 if [ "$OS" = "Darwin" ]; then
-    APP_BUNDLE="/Applications/grars.app"
+    APP_BUNDLE="/Applications/insight-reader.app"
     DESKTOP_FILE=""
     ICON_FILE=""
 else
     APP_BUNDLE=""
-    DESKTOP_FILE="$HOME/.local/share/applications/grars.desktop"
-    ICON_FILE="$HOME/.local/share/icons/hicolor/scalable/apps/grars.svg"
+    DESKTOP_FILE="$HOME/.local/share/applications/insight-reader.desktop"
+    ICON_FILE="$HOME/.local/share/icons/hicolor/scalable/apps/insight-reader.svg"
 fi
 
-CONFIG_FILE="$HOME/.config/grars/config.json"
-CONFIG_DIR="$HOME/.config/grars"
-LOG_DIR="$HOME/.local/share/grars/logs"
+CONFIG_FILE="$HOME/.config/insight-reader/config.json"
+CONFIG_DIR="$HOME/.config/insight-reader"
+LOG_DIR="$HOME/.local/share/insight-reader/logs"
 
 # Parse arguments
 FORCE_PROJECT_ROOT=false
@@ -144,7 +144,7 @@ if [ "$CLEAN_PROJECT" = false ] && [ "$CLEAN_USER" = false ]; then
     fi
     
     if [ "$CLEAN_PROJECT" = false ] && [ "$CLEAN_USER" = false ]; then
-        log_error "No grars installation found to remove."
+        log_error "No insight-reader installation found to remove."
         exit 1
     fi
 fi
@@ -152,9 +152,9 @@ fi
 # Show what will be removed
 echo "=========================================="
 if [ "$OS" = "Darwin" ]; then
-    echo "  grars Uninstall Script (macOS)"
+    echo "  Insight Reader Uninstall Script (macOS)"
 else
-    echo "  grars Uninstall Script (Linux)"
+    echo "  Insight Reader Uninstall Script (Linux)"
 fi
 echo "=========================================="
 echo ""
@@ -177,8 +177,8 @@ if [ "$CLEAN_USER" = true ]; then
     if [ -d "$USER_MODELS" ]; then
         ITEMS_TO_REMOVE+=("User models: $USER_MODELS")
     fi
-    if [ -f "$GRARS_BIN" ]; then
-        ITEMS_TO_REMOVE+=("grars binary: $GRARS_BIN")
+    if [ -f "$INSIGHT_READER_BIN" ]; then
+        ITEMS_TO_REMOVE+=("insight-reader binary: $INSIGHT_READER_BIN")
     fi
     if [ -n "$APP_BUNDLE" ] && [ -d "$APP_BUNDLE" ]; then
         ITEMS_TO_REMOVE+=("App bundle: $APP_BUNDLE")
@@ -267,11 +267,11 @@ if [ "$CLEAN_USER" = true ]; then
         log_success "Removed user models"
     fi
     
-    # Remove grars binary
-    if [ -f "$GRARS_BIN" ]; then
-        log_info "Removing grars binary: $GRARS_BIN"
-        rm -f "$GRARS_BIN"
-        log_success "Removed grars binary"
+    # Remove insight-reader binary
+    if [ -f "$INSIGHT_READER_BIN" ]; then
+        log_info "Removing insight-reader binary: $INSIGHT_READER_BIN"
+        rm -f "$INSIGHT_READER_BIN"
+        log_success "Removed insight-reader binary"
     fi
     
     # Remove app bundle (macOS-specific)

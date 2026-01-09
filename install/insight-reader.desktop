@@ -1,12 +1,11 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=grars
-Comment=Graphical Reader Assistant - Text-to-Speech application
-Exec=$HOME/.local/bin/grars
-Icon=grars
+Name=Insight Reader
+Comment=Insight Reader - Text-to-Speech application
+Exec=$HOME/.local/bin/insight-reader
+Icon=insight-reader
 Terminal=false
 Categories=AudioVideo;
 Keywords=tts;text-to-speech;reader;audio;voice;
 StartupNotify=true
-
