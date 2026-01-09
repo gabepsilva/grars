@@ -250,9 +250,8 @@ create_app_bundle() {
         return 1
     fi
     
-    log_info "Copying binary to app bundle..."
-    cp "$GRARS_BIN" "$APP_MACOS/grars"
-    chmod +x "$APP_MACOS/grars"
+    log_info "Creating symlink to binary in app bundle..."
+    ln -s "$GRARS_BIN" "$APP_MACOS/grars"
     
     # Convert PNG logo to ICNS for macOS icon
     if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
