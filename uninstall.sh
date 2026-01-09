@@ -2,6 +2,14 @@
 # Self-contained uninstall script for grars
 # Removes the grars binary, virtual environment, models, and platform-specific files
 
+# Temporarily disable unbound variable checking to safely check BASH_SOURCE
+set +u
+# Initialize BASH_SOURCE[0] if unbound (happens when script is piped from curl)
+# This prevents "unbound variable" errors when 'set -u' is enabled
+if [ -z "${BASH_SOURCE[0]:-}" ]; then
+    BASH_SOURCE[0]=""
+fi
+# Now re-enable strict mode
 set -euo pipefail
 
 # Colors for output
