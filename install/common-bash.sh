@@ -298,20 +298,35 @@ download_and_install_binary() {
     detect_os
     detect_arch
     
-    # Get latest release tag
-    get_latest_release
-    
     # Construct binary name: grars-linux-x86_64 or grars-macos-aarch64 (no version in filename)
     BINARY_NAME="grars-${OS}-${ARCH}"
     
-    # Use latest release tag, or allow override via RELEASE_TAG env var
-    RELEASE_TAG="${RELEASE_TAG:-$LATEST_RELEASE}"
-    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$RELEASE_TAG/$BINARY_NAME"
+    # Determine release tag to use
+    if [ -n "${RELEASE_TAG:-}" ]; then
+        # Use specific release tag if provided
+        ACTUAL_TAG="$RELEASE_TAG"
+        DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$ACTUAL_TAG/$BINARY_NAME"
+        log_info "Using release tag: $ACTUAL_TAG"
+    else
+        # Get latest release tag for logging, but use /latest/download/ for actual download
+        get_latest_release
+        ACTUAL_TAG="$LATEST_RELEASE"
+        DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/latest/download/$BINARY_NAME"
+        if [ "$ACTUAL_TAG" != "latest" ]; then
+            log_info "Downloading from latest release: $ACTUAL_TAG"
+        else
+            log_info "Downloading from latest release (tag detection failed, using redirect)"
+        fi
+    fi
     
     # Download binary
     if download_file "$DOWNLOAD_URL" "$INSIGHT_READER_BIN"; then
         chmod +x "$INSIGHT_READER_BIN"
-        log_success "Binary downloaded and installed to $INSIGHT_READER_BIN"
+        if [ "$ACTUAL_TAG" != "latest" ]; then
+            log_success "Binary downloaded and installed to $INSIGHT_READER_BIN (release: $ACTUAL_TAG)"
+        else
+            log_success "Binary downloaded and installed to $INSIGHT_READER_BIN"
+        fi
         return 0
     else
         if ! command_exists curl && ! command_exists wget; then
