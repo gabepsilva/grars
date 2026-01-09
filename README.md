@@ -41,6 +41,7 @@ The application displays a compact floating window with:
 This application has been tested on:
 - **Ubuntu** with GNOME (Wayland)
 - **Arch Linux** with Hyprland (Wayland)
+- **macOS** (Apple Silicon and Intel)
 
 While it should work on other Linux distributions and window managers, these are the primary tested environments.
 
@@ -68,7 +69,8 @@ wget -qO- https://raw.githubusercontent.com/gabepsilva/grars/master/install.sh |
 - **System dependencies** (automatically installed by install script):
   - `python3` and `python3-venv` (for Piper TTS)
   - `espeak-ng` (for text processing)
-  - `wl-clipboard` (Wayland) or `xclip` (X11) for clipboard access
+  - **Linux**: `wl-clipboard` (Wayland) or `xclip` (X11) for clipboard access
+  - **macOS**: No additional dependencies (uses built-in `osascript` and `pbpaste`)
 
 #### Build from Source
 
@@ -222,8 +224,12 @@ Log level can be changed in the settings window.
 
 ### Clipboard not working
 
-- **Wayland**: Ensure `wl-clipboard` is installed
-- **X11**: Ensure `xclip` is installed
+- **Linux Wayland**: Ensure `wl-clipboard` is installed
+- **Linux X11**: Ensure `xclip` is installed
+- **macOS**: 
+  - Grant accessibility permissions: **System Preferences/Settings → Security & Privacy → Privacy → Accessibility**
+  - Add `grars` (or Terminal if running from terminal) to the allowed apps list
+  - Try selecting text before running `grars`
 - Try selecting text before running `grars`
 
 ### Piper TTS not found

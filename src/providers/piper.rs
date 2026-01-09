@@ -73,6 +73,17 @@ impl PiperTTSProvider {
         })
     }
 
+    /// On macOS, check Linux-style path (~/.local/share/grars) for compatibility.
+    #[cfg(target_os = "macos")]
+    fn check_linux_style_path(relative_path: &str) -> Option<PathBuf> {
+        dirs::home_dir().map(|home| {
+            home.join(".local")
+                .join("share")
+                .join("grars")
+                .join(relative_path)
+        })
+    }
+
     /// Find the piper binary in standard locations.
     fn find_piper_binary() -> PathBuf {
         // Check project-local virtualenv first (development)
@@ -93,6 +104,18 @@ impl PiperTTSProvider {
             if user_piper.exists() {
                 debug!(path = %user_piper.display(), "Using user-installed piper binary");
                 return user_piper;
+            }
+        }
+
+        // On macOS, also check Linux-style location (~/.local/share/grars)
+        // since install scripts may use this location
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(linux_style_piper) = Self::check_linux_style_path("venv/bin/piper") {
+                if linux_style_piper.exists() {
+                    debug!(path = %linux_style_piper.display(), "Using Linux-style piper binary (macOS)");
+                    return linux_style_piper;
+                }
             }
         }
 
@@ -149,6 +172,21 @@ impl PiperTTSProvider {
                     "Using user-installed Piper model"
                 );
                 return user_model;
+            }
+        }
+
+        // On macOS, also check Linux-style location (~/.local/share/grars)
+        // since install scripts may use this location
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(linux_style_model) = Self::check_linux_style_path(&format!("models/{}", model_name)) {
+                if linux_style_model.with_extension("onnx").exists() {
+                    debug!(
+                        path = %linux_style_model.with_extension("onnx").display(),
+                        "Using Linux-style Piper model (macOS)"
+                    );
+                    return linux_style_model;
+                }
             }
         }
 
