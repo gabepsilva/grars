@@ -1,5 +1,6 @@
 //! Domain model for the application state
 
+use std::collections::HashMap;
 use iced::window;
 use crate::providers::TTSProvider;
 use crate::config;
@@ -44,6 +45,45 @@ pub enum Message {
     SelectedTextFetched(Option<String>), // Result of async text selection fetch
     TextCleanupResponse(Result<String, String>), // Result of text cleanup API call
     StartDrag, // Begin dragging the window
+    VoiceSelected(String), // Voice key selected (e.g., "en_US-lessac-medium")
+    VoiceDownloadRequested(String), // Voice key to download
+    VoiceDownloaded(Result<String, String>), // Download completion (voice key or error)
+    VoicesJsonLoaded(Result<HashMap<String, VoiceInfo>, String>), // voices.json loaded
+    OpenVoiceSelection(String), // Open voice selection window for language code
+    CloseVoiceSelection, // Close voice selection window
+}
+
+/// Voice metadata from piper-voices repository
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct VoiceInfo {
+    pub key: String,
+    pub name: String,
+    pub language: LanguageInfo,
+    pub quality: String,
+    pub num_speakers: u32,
+    #[serde(default)]
+    pub speaker_id_map: HashMap<String, u32>,
+    pub files: HashMap<String, FileInfo>,
+    #[serde(default)]
+    pub aliases: Vec<String>,
+}
+
+/// Language information for a voice
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct LanguageInfo {
+    pub code: String,
+    pub family: String,
+    pub region: String,
+    pub name_native: String,
+    pub name_english: String,
+    pub country_english: String,
+}
+
+/// File information for voice model files
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct FileInfo {
+    pub size_bytes: u64,
+    pub md5_digest: String,
 }
 
 /// Application state.
@@ -68,6 +108,16 @@ pub struct App {
     pub loading_animation_time: f32,
     /// Status text shown during loading (e.g., "Cleaning text...", "Synthesizing voice...")
     pub status_text: Option<String>,
+    /// Selected voice key (e.g., "en_US-lessac-medium")
+    pub selected_voice: Option<String>,
+    /// Selected language code for voice selection (e.g., "en_US")
+    pub selected_language: Option<String>,
+    /// All available voices loaded from voices.json
+    pub voices: Option<HashMap<String, VoiceInfo>>,
+    /// Voice selection window ID
+    pub voice_selection_window_id: Option<window::Id>,
+    /// Voice currently being downloaded (if any)
+    pub downloading_voice: Option<String>,
 }
 
 impl Default for App {
@@ -89,6 +139,11 @@ impl Default for App {
             is_loading: false,
             loading_animation_time: 0.0,
             status_text: None,
+            selected_voice: None,
+            selected_language: None,
+            voices: None,
+            voice_selection_window_id: None,
+            downloading_voice: None,
         }
     }
 }
@@ -99,6 +154,7 @@ impl App {
         let selected_backend = config::load_voice_provider();
         let log_level = config::load_log_level();
         let text_cleanup_enabled = config::load_text_cleanup_enabled();
+        let selected_voice = config::load_selected_voice();
         Self {
             playback_state: PlaybackState::Stopped,
             progress: 0.0,
@@ -116,6 +172,11 @@ impl App {
             is_loading: false,
             loading_animation_time: 0.0,
             status_text: None,
+            selected_voice,
+            selected_language: None,
+            voices: None,
+            voice_selection_window_id: None,
+            downloading_voice: None,
         }
     }
 }

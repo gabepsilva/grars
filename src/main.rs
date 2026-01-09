@@ -9,6 +9,7 @@ mod styles;
 mod system;
 mod update;
 mod view;
+mod voices;
 
 use iced::daemon;
 use tracing::info;

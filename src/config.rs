@@ -56,6 +56,10 @@ struct RawConfig {
     /// Whether text cleanup is enabled (sends text to cleanup API before TTS).
     #[serde(default)]
     text_cleanup_enabled: Option<bool>,
+
+    /// Selected Piper voice key (e.g., "en_US-lessac-medium").
+    #[serde(default)]
+    selected_voice: Option<String>,
 }
 
 fn config_path() -> Option<PathBuf> {
@@ -99,6 +103,7 @@ fn save_raw_config(mut cfg: RawConfig) -> Result<(), ConfigError> {
     // Normalize by dropping empty strings if present.
     cfg.voice_provider = cfg.voice_provider.filter(|s| !s.is_empty());
     cfg.log_level = cfg.log_level.filter(|s| !s.is_empty());
+    cfg.selected_voice = cfg.selected_voice.filter(|s| !s.is_empty());
 
     let data = serde_json::to_string_pretty(&cfg)?;
     fs::write(&path, data)?;
@@ -233,3 +238,25 @@ pub fn save_text_cleanup_enabled(enabled: bool) {
     }
 }
 
+/// Load the persisted selected voice, returning None if not set or invalid.
+pub fn load_selected_voice() -> Option<String> {
+    match load_raw_config() {
+        Ok(cfg) => cfg.selected_voice.filter(|s| !s.is_empty()),
+        Err(err) => {
+            warn!(error = ?err, "Failed to load config, no voice selected");
+            None
+        }
+    }
+}
+
+/// Persist the selected voice to disk.
+///
+/// Errors are logged and otherwise ignored.
+pub fn save_selected_voice(voice_key: String) {
+    debug!(voice_key = %voice_key, "Saving selected voice");
+    let mut cfg = load_or_default_config();
+    cfg.selected_voice = Some(voice_key);
+    if let Err(err) = save_raw_config(cfg) {
+        error!(error = ?err, "Failed to save config");
+    }
+}

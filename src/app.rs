@@ -3,7 +3,7 @@
 use iced::time::{self, Duration};
 use iced::{Element, Point, Size, Subscription, Task};
 use iced::window;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::model::{App, Message, PlaybackState};
 use crate::update;
@@ -39,11 +39,7 @@ pub fn new() -> (App, Task<Message>) {
     // This runs in a background task so it doesn't delay the UI
     let fetch_text_task = Task::perform(
         async {
-            use tracing::debug;
             debug!("Starting async text fetch task");
-            // Small delay to ensure window is fully visible before fetching
-            //tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            //debug!("Delay complete, fetching selected text");
             // Use spawn_blocking for the blocking shell command
             let result = tokio::task::spawn_blocking(|| {
                 debug!("Executing get_selected_text in blocking thread");
@@ -59,13 +55,24 @@ pub fn new() -> (App, Task<Message>) {
         Message::SelectedTextFetched,
     );
     
-    (app, Task::batch([open_task, fetch_text_task]))
+    // Fetch voices.json asynchronously on startup
+    let fetch_voices_task = Task::perform(
+        async {
+            debug!("Fetching voices.json from Hugging Face");
+            crate::voices::fetch_voices_json().await
+        },
+        Message::VoicesJsonLoaded,
+    );
+    
+    (app, Task::batch([open_task, fetch_text_task, fetch_voices_task]))
 }
 
 pub fn title(app: &App, window: window::Id) -> String {
     // Set different titles for different windows
     if app.settings_window_id == Some(window) {
         String::from("Settings")
+    } else if app.voice_selection_window_id == Some(window) {
+        String::from("Select Voice")
     } else {
         String::from("Insight Reader")
     }
@@ -79,6 +86,11 @@ pub fn view(app: &App, window: window::Id) -> Element<'_, Message> {
     // Show settings window if this is the settings window
     if app.settings_window_id == Some(window) {
         return view::settings_window_view(app);
+    }
+    
+    // Show voice selection window if this is the voice selection window
+    if app.voice_selection_window_id == Some(window) {
+        return view::voice_selection_window_view(app);
     }
     
     view::main_view(app)
@@ -95,9 +107,9 @@ pub fn subscription(app: &App) -> Subscription<Message> {
     });
     
     // Run animation/polling at ~75ms intervals
-    // Poll when playing, paused, or loading
-    let tick = match (app.playback_state, app.is_loading) {
-        (PlaybackState::Stopped, false) => Subscription::none(),
+    // Poll when playing, paused, loading, or downloading a voice
+    let tick = match (app.playback_state, app.is_loading, app.downloading_voice.is_some()) {
+        (PlaybackState::Stopped, false, false) => Subscription::none(),
         _ => time::every(Duration::from_millis(75)).map(|_| Message::Tick),
     };
     

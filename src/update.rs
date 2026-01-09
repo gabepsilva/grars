@@ -77,7 +77,7 @@ fn clear_loading_state(app: &mut App) {
 /// Returns the window ID and task mapped to Message::WindowOpened.
 fn open_settings_window() -> (window::Id, Task<Message>) {
     let (window_id, task) = window::open(window::Settings {
-        size: Size::new(760.0, 360.0),
+        size: Size::new(860.0, 610.0),
         resizable: false,
         decorations: false,
         transparent: false,
@@ -219,34 +219,29 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             handle_skip(app, |p| p.skip_forward(SKIP_SECONDS), "forward")
         }
         Message::PlayPause => {
-            if let Some(ref mut provider) = app.provider {
-                match app.playback_state {
-                    PlaybackState::Playing => {
-                        match provider.pause() {
-                            Ok(()) => {
-                                app.playback_state = PlaybackState::Paused;
-                                info!("Playback paused");
-                            }
-                            Err(e) => {
-                                error!(error = %e, "Failed to pause playback");
-                            }
-                        };
-                    }
-                    PlaybackState::Paused => {
-                        match provider.resume() {
-                            Ok(()) => {
-                                app.playback_state = PlaybackState::Playing;
-                                info!("Playback resumed");
-                            }
-                            Err(e) => {
-                                error!(error = %e, "Failed to resume playback");
-                            }
-                        };
-                    }
-                    PlaybackState::Stopped => {}
-                }
-            } else {
+            let Some(ref mut provider) = app.provider else {
                 warn!("PlayPause received with no active provider");
+                return Task::none();
+            };
+            
+            match app.playback_state {
+                PlaybackState::Playing => {
+                    if let Err(e) = provider.pause() {
+                        error!(error = %e, "Failed to pause playback");
+                    } else {
+                        app.playback_state = PlaybackState::Paused;
+                        info!("Playback paused");
+                    }
+                }
+                PlaybackState::Paused => {
+                    if let Err(e) = provider.resume() {
+                        error!(error = %e, "Failed to resume playback");
+                    } else {
+                        app.playback_state = PlaybackState::Playing;
+                        info!("Playback resumed");
+                    }
+                }
+                PlaybackState::Stopped => {}
             }
             Task::none()
         }
@@ -264,26 +259,28 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             window::latest().and_then(window::close)
         }
         Message::Tick => {
-            // Handle loading animation
-            if app.is_loading {
+            // Handle loading animation (for TTS or voice downloads)
+            if app.is_loading || app.downloading_voice.is_some() {
                 app.loading_animation_time += 0.15; // Increment animation time (faster animation)
                 if app.loading_animation_time > std::f32::consts::PI * 2.0 {
                     app.loading_animation_time -= std::f32::consts::PI * 2.0;
                 }
                 
-                // Generate animated bar values using sine waves
-                // Creates a smooth wave that travels across the bars
-                app.frequency_bands = (0..NUM_BANDS)
-                    .map(|i| {
-                        // Create a traveling wave effect
-                        let position = i as f32 / NUM_BANDS as f32;
-                        let wave = (app.loading_animation_time * 2.0 + position * std::f32::consts::PI * 2.0).sin();
-                        // Add some variation with a secondary wave
-                        let secondary = (app.loading_animation_time * 1.5 + position * std::f32::consts::PI * 3.0).sin() * 0.3;
-                        // Normalize to 0.0-1.0 range with some minimum height
-                        ((wave + secondary) * 0.4 + 0.5).clamp(0.2, 1.0)
-                    })
-                    .collect();
+                // Generate animated bar values using sine waves (only for TTS loading, not voice downloads)
+                if app.is_loading {
+                    // Creates a smooth wave that travels across the bars
+                    app.frequency_bands = (0..NUM_BANDS)
+                        .map(|i| {
+                            // Create a traveling wave effect
+                            let position = i as f32 / NUM_BANDS as f32;
+                            let wave = (app.loading_animation_time * 2.0 + position * std::f32::consts::PI * 2.0).sin();
+                            // Add some variation with a secondary wave
+                            let secondary = (app.loading_animation_time * 1.5 + position * std::f32::consts::PI * 3.0).sin() * 0.3;
+                            // Normalize to 0.0-1.0 range with some minimum height
+                            ((wave + secondary) * 0.4 + 0.5).clamp(0.2, 1.0)
+                        })
+                        .collect();
+                }
             } else if let Some(ref provider) = app.provider {
                 app.progress = provider.get_progress();
                 app.frequency_bands = provider.get_frequency_bands(NUM_BANDS);
@@ -306,19 +303,11 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             }
             
             debug!("Settings clicked");
-            let (window_id, task) = window::open(window::Settings {
-                size: Size::new(760.0, 360.0),
-                resizable: false,
-                decorations: false,
-                transparent: false,
-                visible: true,
-                position: window::Position::Centered,
-                ..Default::default()
-            });
+            let (window_id, task) = open_settings_window();
             debug!(?window_id, "Opening settings window");
             app.settings_window_id = Some(window_id);
             app.show_settings_modal = true;
-            task.map(Message::WindowOpened)
+            task
         }
         Message::CloseSettings => {
             app.show_settings_modal = false;
@@ -391,6 +380,9 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 app.settings_window_id = None;
                 app.show_settings_modal = false;
             }
+            if app.voice_selection_window_id == Some(id) {
+                app.voice_selection_window_id = None;
+            }
             if app.current_window_id == Some(id) {
                 app.current_window_id = None;
             }
@@ -446,20 +438,22 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             match result {
                 Ok(()) => {
                     // Retrieve provider from static storage
-                    if let Ok(mut guard) = PENDING_PROVIDER.lock() {
-                        if let Some(send_provider) = guard.take() {
-                            app.provider = Some(send_provider.0);
-                            app.playback_state = PlaybackState::Playing;
-                            app.error_message = None;
-                            info!("TTS provider initialized and playback started");
-                        } else {
-                            error!("TTS initialization succeeded but no provider found in storage");
-                            app.error_message = Some("Internal error: provider not found".to_string());
-                        }
-                    } else {
+                    let Ok(mut guard) = PENDING_PROVIDER.lock() else {
                         error!("Failed to lock PENDING_PROVIDER mutex");
                         app.error_message = Some("Internal error: mutex lock failed".to_string());
-                    }
+                        return Task::none();
+                    };
+                    
+                    let Some(send_provider) = guard.take() else {
+                        error!("TTS initialization succeeded but no provider found in storage");
+                        app.error_message = Some("Internal error: provider not found".to_string());
+                        return Task::none();
+                    };
+                    
+                    app.provider = Some(send_provider.0);
+                    app.playback_state = PlaybackState::Playing;
+                    app.error_message = None;
+                    info!("TTS provider initialized and playback started");
                 }
                 Err(e) => {
                     error!(error = %e, "TTS initialization failed");
@@ -474,6 +468,110 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             } else {
                 Task::none()
             }
+        }
+        Message::VoicesJsonLoaded(result) => {
+            match result {
+                Ok(voices) => {
+                    info!(count = voices.len(), "Voices.json loaded successfully");
+                    app.voices = Some(voices);
+                }
+                Err(e) => {
+                    error!(error = %e, "Failed to load voices.json");
+                    // Show error to user in settings window if it's open
+                    if app.settings_window_id.is_some() {
+                        app.error_message = Some(format!("Failed to load voices: {}. Check your internet connection.", e));
+                    }
+                }
+            }
+            Task::none()
+        }
+        Message::OpenVoiceSelection(lang_code) => {
+            // Prevent opening multiple voice selection windows
+            if app.voice_selection_window_id.is_some() {
+                debug!("Voice selection window already open, ignoring request");
+                return Task::none();
+            }
+            
+            debug!(language = %lang_code, "Opening voice selection window");
+            app.selected_language = Some(lang_code);
+            
+            let (window_id, task) = window::open(window::Settings {
+                size: Size::new(400.0, 500.0), // 33% narrower: 600 * 0.67 ≈ 400
+                resizable: false,
+                decorations: false,
+                transparent: false,
+                visible: true,
+                position: window::Position::Centered,
+                ..Default::default()
+            });
+            app.voice_selection_window_id = Some(window_id);
+            task.map(Message::WindowOpened)
+        }
+        Message::CloseVoiceSelection => {
+            if let Some(window_id) = app.voice_selection_window_id.take() {
+                window::close(window_id)
+            } else {
+                Task::none()
+            }
+        }
+        Message::VoiceSelected(voice_key) => {
+            info!(voice = %voice_key, "Voice selected");
+            app.selected_voice = Some(voice_key.clone());
+            config::save_selected_voice(voice_key);
+            // Close voice selection window after selection
+            if let Some(window_id) = app.voice_selection_window_id.take() {
+                return window::close(window_id);
+            }
+            Task::none()
+        }
+        Message::VoiceDownloadRequested(voice_key) => {
+            info!(voice = %voice_key, "Voice download requested");
+            
+            // Get voice info from loaded voices
+            let voice_info = if let Some(ref voices) = app.voices {
+                voices.get(&voice_key).cloned()
+            } else {
+                None
+            };
+            
+            if let Some(voice_info) = voice_info {
+                // Set downloading state
+                app.downloading_voice = Some(voice_key.clone());
+                set_loading_state(app, &format!("Downloading voice: {}...", voice_info.name));
+                
+                // Start async download
+                Task::perform(
+                    async move {
+                        use crate::voices::download;
+                        download::download_voice(&voice_key, &voice_info)
+                            .await
+                            .map(|_| voice_key)
+                    },
+                    Message::VoiceDownloaded,
+                )
+            } else {
+                error!(voice = %voice_key, "Voice not found in voices.json");
+                app.error_message = Some(format!("Voice {} not found", voice_key));
+                Task::none()
+            }
+        }
+        Message::VoiceDownloaded(result) => {
+            clear_loading_state(app);
+            app.downloading_voice = None;
+            match result {
+                Ok(voice_key) => {
+                    info!(voice = %voice_key, "Voice downloaded successfully");
+                    app.status_text = Some("Voice downloaded successfully".to_string());
+                    // Auto-select the downloaded voice
+                    app.selected_voice = Some(voice_key.clone());
+                    config::save_selected_voice(voice_key);
+                }
+                Err(e) => {
+                    error!(error = %e, "Voice download failed");
+                    app.error_message = Some(format!("Download failed: {}", e));
+                }
+            }
+            Task::none()
         }
     }
 }

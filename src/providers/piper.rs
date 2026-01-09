@@ -149,11 +149,13 @@ impl PiperTTSProvider {
 
     /// Find the model file in standard locations.
     fn find_model() -> PathBuf {
-        let model_name = "en_US-lessac-medium";
+        // Try to load selected voice from config, fallback to default
+        let model_name = crate::config::load_selected_voice()
+            .unwrap_or_else(|| "en_US-lessac-medium".to_string());
 
         // Check project models directory first (for development)
         if let Ok(current_dir) = env::current_dir() {
-            let project_model = current_dir.join("models").join(model_name);
+            let project_model = current_dir.join("models").join(&model_name);
             if project_model.with_extension("onnx").exists() {
                 debug!(
                     path = %project_model.with_extension("onnx").display(),
@@ -165,7 +167,7 @@ impl PiperTTSProvider {
 
         // Check user installation (XDG Base Directory standard: ~/.local/share/insight-reader)
         if let Some(data_dir) = dirs::data_dir() {
-            let user_model = data_dir.join("insight-reader").join("models").join(model_name);
+            let user_model = data_dir.join("insight-reader").join("models").join(&model_name);
             if user_model.with_extension("onnx").exists() {
                 debug!(
                     path = %user_model.with_extension("onnx").display(),
@@ -195,7 +197,7 @@ impl PiperTTSProvider {
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("insight-reader")
             .join("models")
-            .join(model_name);
+            .join(&model_name);
         warn!(
             path = %fallback.with_extension("onnx").display(),
             "Piper model not found in known locations, using fallback path"
