@@ -102,12 +102,7 @@ check_and_install_dependencies() {
         log_success "espeak-ng found"
     fi
     
-    # Check clipboard utilities (macOS has pbpaste built-in)
-    if command_exists pbpaste; then
-        log_success "pbpaste found (macOS clipboard support)"
-    else
-        log_warn "pbpaste not found (unusual - should be built-in on macOS)"
-    fi
+    # Clipboard support is handled by arboard crate (no external dependencies needed)
     
     # Check Python3
     local python_missing=false

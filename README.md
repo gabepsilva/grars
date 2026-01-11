@@ -68,7 +68,7 @@ wget -qO- https://insightreader.xyz/install.sh | bash
   - `python3` and `python3-venv` (for Piper TTS)
   - `espeak-ng` (for text processing)
   - **Linux**: `wl-clipboard` (Wayland) or `xclip` (X11) for clipboard access
-  - **macOS**: No additional dependencies (uses built-in `osascript` and `pbpaste`)
+  - **macOS**: No additional dependencies (clipboard handled by `arboard` crate)
 
 #### Build from Source
 
