@@ -89,6 +89,7 @@ pub fn title(app: &App, window: window::Id) -> String {
         w if app.voice_selection_window_id == Some(w) => "Select Voice",
         w if app.polly_info_window_id == Some(w) => "AWS Polly Pricing Information",
         w if app.screenshot_window_id == Some(w) => "Screenshot",
+        w if app.text_cleanup_info_window_id == Some(w) => "Text Cleanup Information",
         _ => "Insight Reader",
     }
     .to_string()
@@ -117,6 +118,16 @@ pub fn view(app: &App, window: window::Id) -> Element<'_, Message> {
     // Show screenshot viewer if this is the screenshot window
     if app.screenshot_window_id == Some(window) {
         return view::screenshot_viewer_view(app);
+    }
+    
+    // Show Better OCR info modal if this is the OCR info modal window
+    if app.ocr_info_window_id == Some(window) {
+        return view::ocr_info_window_view(app);
+    }
+    
+    // Show Text Cleanup info modal if this is the Text Cleanup info modal window
+    if app.text_cleanup_info_window_id == Some(window) {
+        return view::text_cleanup_info_window_view(app);
     }
     
     view::main_view(app)

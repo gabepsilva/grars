@@ -12,6 +12,12 @@ pub enum TTSBackend {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OCRBackend {
+    Default,
+    BetterOCR,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogLevel {
     Error,
     Warn,
@@ -55,6 +61,11 @@ pub enum Message {
     OpenPollyInfo, // Open AWS Polly pricing info modal
     ClosePollyInfo, // Close AWS Polly pricing info modal
     OpenPollyPricingUrl, // Open AWS Polly pricing URL in browser
+    OCRBackendSelected(OCRBackend), // OCR backend selected
+    OpenOCRInfo, // Open Better OCR info modal
+    CloseOCRInfo, // Close Better OCR info modal
+    OpenTextCleanupInfo, // Open Text Cleanup info modal
+    CloseTextCleanupInfo, // Close Text Cleanup info modal
     ScreenshotRequested, // User clicked screenshot button
     ScreenshotCaptured(Result<String, String>), // Screenshot result (file path or error)
     ScreenshotTextExtracted(Result<String, String>), // Text extracted from screenshot (text or error)
@@ -140,6 +151,12 @@ pub struct App {
     pub screenshot_path: Option<String>,
     /// Screenshot viewer window ID
     pub screenshot_window_id: Option<window::Id>,
+    /// Selected OCR backend
+    pub selected_ocr_backend: OCRBackend,
+    /// Better OCR info modal window ID
+    pub ocr_info_window_id: Option<window::Id>,
+    /// Text Cleanup info modal window ID
+    pub text_cleanup_info_window_id: Option<window::Id>,
 }
 
 impl Default for App {
@@ -171,6 +188,9 @@ impl Default for App {
             polly_info_window_id: None,
             screenshot_path: None,
             screenshot_window_id: None,
+            selected_ocr_backend: OCRBackend::Default,
+            ocr_info_window_id: None,
+            text_cleanup_info_window_id: None,
         }
     }
 }
@@ -182,6 +202,7 @@ impl App {
         let log_level = config::load_log_level();
         let text_cleanup_enabled = config::load_text_cleanup_enabled();
         let selected_voice = config::load_selected_voice();
+        let selected_ocr_backend = config::load_ocr_backend();
         Self {
             playback_state: PlaybackState::Stopped,
             progress: 0.0,
@@ -209,6 +230,9 @@ impl App {
             polly_info_window_id: None,
             screenshot_path: None,
             screenshot_window_id: None,
+            selected_ocr_backend,
+            ocr_info_window_id: None,
+            text_cleanup_info_window_id: None,
         }
     }
 }

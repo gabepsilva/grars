@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use dirs::config_dir;
 use tracing::{debug, error, warn};
 
-use crate::model::{LogLevel, TTSBackend};
+use crate::model::{LogLevel, OCRBackend, TTSBackend};
 
 const APP_CONFIG_DIR_NAME: &str = "insight-reader";
 const CONFIG_FILE_NAME: &str = "config.json";
@@ -63,6 +63,10 @@ struct RawConfig {
     /// Selected AWS Polly voice ID (e.g., "Matthew", "Joanna").
     #[serde(default)]
     selected_polly_voice: Option<String>,
+
+    /// OCR backend name ("default" or "better_ocr").
+    #[serde(default)]
+    ocr_backend: Option<String>,
 }
 
 fn config_path() -> Option<PathBuf> {
@@ -108,6 +112,7 @@ fn save_raw_config(mut cfg: RawConfig) -> Result<(), ConfigError> {
     cfg.voice_provider = cfg.voice_provider.filter(|s| !s.is_empty());
     cfg.log_level = cfg.log_level.filter(|s| !s.is_empty());
     cfg.selected_voice = cfg.selected_voice.filter(|s| !s.is_empty());
+    cfg.ocr_backend = cfg.ocr_backend.filter(|s| !s.is_empty());
 
     let data = serde_json::to_string_pretty(&cfg)?;
     fs::write(&path, data)?;
@@ -283,6 +288,48 @@ pub fn save_selected_polly_voice(voice_id: String) {
     debug!(voice_id = %voice_id, "Saving selected AWS Polly voice");
     let mut cfg = load_or_default_config();
     cfg.selected_polly_voice = Some(voice_id);
+    if let Err(err) = save_raw_config(cfg) {
+        error!(error = ?err, "Failed to save config");
+    }
+}
+
+fn ocr_backend_from_str(s: &str) -> Option<OCRBackend> {
+    match s {
+        "default" => Some(OCRBackend::Default),
+        "better_ocr" => Some(OCRBackend::BetterOCR),
+        _ => None,
+    }
+}
+
+fn ocr_backend_to_str(backend: OCRBackend) -> &'static str {
+    match backend {
+        OCRBackend::Default => "default",
+        OCRBackend::BetterOCR => "better_ocr",
+    }
+}
+
+/// Load the persisted OCR backend, defaulting to `Default` if not set.
+pub fn load_ocr_backend() -> OCRBackend {
+    match load_raw_config() {
+        Ok(cfg) => {
+            cfg.ocr_backend
+                .and_then(|s| ocr_backend_from_str(&s))
+                .unwrap_or(OCRBackend::Default)
+        }
+        Err(err) => {
+            warn!(error = ?err, "Failed to load config, using default OCR backend");
+            OCRBackend::Default
+        }
+    }
+}
+
+/// Persist the OCR backend to disk.
+///
+/// Errors are logged and otherwise ignored.
+pub fn save_ocr_backend(backend: OCRBackend) {
+    debug!(?backend, "Saving OCR backend");
+    let mut cfg = load_or_default_config();
+    cfg.ocr_backend = Some(ocr_backend_to_str(backend).to_string());
     if let Err(err) = save_raw_config(cfg) {
         error!(error = ?err, "Failed to save config");
     }

@@ -3,7 +3,7 @@
 use iced::widget::{button, checkbox, column, container, mouse_area, progress_bar, radio, row, scrollable, svg, text, Space};
 use iced::{Alignment, Background, Color, ContentFit, Element, Length};
 
-use crate::model::{App, LanguageInfo, LogLevel, Message, PlaybackState, TTSBackend};
+use crate::model::{App, LanguageInfo, LogLevel, Message, OCRBackend, PlaybackState, TTSBackend};
 use crate::styles::{
     circle_button_style, close_button_style, error_container_style, header_style,
     modal_content_style, section_style, transparent_button_style, wave_bar_style,
@@ -668,10 +668,32 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
     .style(section_style);
 
     // Text Cleanup section
-    let text_cleanup_control = checkbox(app.text_cleanup_enabled)
-        .label("Enable text cleanup (sends text to local API before TTS)")
-        .on_toggle(Message::TextCleanupToggled)
-        .style(white_checkbox_style);
+    let text_cleanup_control = row![
+        checkbox(app.text_cleanup_enabled)
+            .label("Enable text cleanup (sends text to local API before TTS)")
+            .on_toggle(Message::TextCleanupToggled)
+            .style(white_checkbox_style),
+        Space::new().width(Length::Fixed(8.0)),
+        // Info icon button (circled i)
+        button(
+            container(
+                white_text("ⓘ", 16)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some(Color::from_rgb(0.3, 0.6, 1.0)),
+                    })
+            )
+            .width(Length::Fixed(24.0))
+            .height(Length::Fixed(24.0))
+            .center_x(Length::Fixed(24.0))
+            .center_y(Length::Fixed(24.0))
+        )
+        .style(transparent_button_style)
+        .width(Length::Fixed(24.0))
+        .height(Length::Fixed(24.0))
+        .on_press(Message::OpenTextCleanupInfo),
+    ]
+    .align_y(Alignment::Center)
+    .spacing(0);
 
     let text_cleanup_section = container(
         row![
@@ -686,6 +708,76 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
             Space::new().width(Length::Fixed(16.0)),
             container(text_cleanup_control)
                 .width(Length::Fill)
+                .align_x(Alignment::Start),
+        ]
+        .align_y(Alignment::Center)
+        .width(Length::Fill)
+        .padding([12.0, 16.0])
+    )
+    .style(section_style);
+
+    // OCR section
+    let ocr_controls = column![
+        radio(
+            "Standard OCR (Apple Vision Framework, local)",
+            OCRBackend::Default,
+            Some(app.selected_ocr_backend),
+            Message::OCRBackendSelected
+        )
+        .style(white_radio_style),
+        Space::new().height(Length::Fixed(6.0)),
+        row![
+            radio(
+                "Better OCR (Cloud service) - Coming soon",
+                OCRBackend::BetterOCR,
+                Some(app.selected_ocr_backend),
+                Message::OCRBackendSelected
+            )
+            .style(|theme, status| {
+                let mut style = white_radio_style(theme, status);
+                // Make it appear disabled with reduced opacity
+                style.text_color = Some(Color::from_rgba(1.0, 1.0, 1.0, 0.4));
+                style.border_color = Color::from_rgba(1.0, 1.0, 1.0, 0.3);
+                style.dot_color = Color::from_rgba(0.4, 0.6, 1.0, 0.4);
+                style
+            }),
+            Space::new().width(Length::Fixed(8.0)),
+            // Info icon button (circled i)
+            button(
+                container(
+                    white_text("ⓘ", 16)
+                        .style(|_theme| iced::widget::text::Style {
+                            color: Some(Color::from_rgb(0.3, 0.6, 1.0)),
+                        })
+                )
+                .width(Length::Fixed(24.0))
+                .height(Length::Fixed(24.0))
+                .center_x(Length::Fixed(24.0))
+                .center_y(Length::Fixed(24.0))
+            )
+            .style(transparent_button_style)
+            .width(Length::Fixed(24.0))
+            .height(Length::Fixed(24.0))
+            .on_press(Message::OpenOCRInfo),
+        ]
+        .align_y(Alignment::Center)
+        .spacing(0),
+    ]
+    .spacing(0);
+
+    let ocr_section = container(
+        row![
+            container(
+                white_text("OCR", 14)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some(Color::from_rgba(1.0, 1.0, 1.0, 0.85)),
+                    })
+            )
+            .width(Length::Fixed(120.0))
+            .align_x(Alignment::Start),
+            Space::new().width(Length::Fixed(16.0)),
+            container(ocr_controls)
+                .width(Length::Shrink)
                 .align_x(Alignment::Start),
         ]
         .align_y(Alignment::Center)
@@ -716,11 +808,13 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
             scrollable(
                 container(
                     column![
+                        ocr_section,
+                        Space::new().height(Length::Fixed(12.0)),
+                        text_cleanup_section,
+                        Space::new().height(Length::Fixed(12.0)),
                         provider_section,
                         Space::new().height(Length::Fixed(12.0)),
                         log_level_section,
-                        Space::new().height(Length::Fixed(12.0)),
-                        text_cleanup_section,
                     ]
                     .padding([20.0, 24.0])
                     .spacing(0)
@@ -1230,6 +1324,164 @@ pub fn polly_info_window_view<'a>(_app: &'a App) -> Element<'a, Message> {
                         .width(Length::Fill)
                         .padding([0.0, 24.0])
                         .align_x(Alignment::Start),
+                        Space::new().height(Length::Fixed(20.0)),
+                    ]
+                    .spacing(12)
+                )
+                .width(Length::Fill)
+                .style(|_theme| container::Style {
+                    background: Some(Background::Color(Color::from_rgb(0.12, 0.12, 0.14))),
+                    ..Default::default()
+                }),
+            )
+            .width(Length::Fill)
+            .height(Length::Fill),
+        ]
+        .spacing(0)
+        .width(Length::Fill)
+        .height(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .center_x(Length::Fill)
+    .center_y(Length::Fill)
+    .style(modal_content_style)
+    .into()
+}
+
+/// Text Cleanup information modal window
+pub fn text_cleanup_info_window_view<'a>(_app: &'a App) -> Element<'a, Message> {
+    let close_button = button(
+        container(white_text("✕", 18))
+            .width(Length::Fixed(28.0))
+            .height(Length::Fixed(28.0))
+            .center_x(Length::Fixed(28.0))
+            .center_y(Length::Fixed(28.0)),
+    )
+    .style(close_button_style)
+    .on_press(Message::CloseTextCleanupInfo);
+
+    container(
+        column![
+            // Header bar
+            container(
+                row![
+                    white_text("Text Cleanup Information", 20)
+                        .style(|_theme| iced::widget::text::Style {
+                            color: Some(Color::WHITE),
+                        }),
+                    Space::new().width(Length::Fill),
+                    close_button,
+                ]
+                .width(Length::Fill)
+                .align_y(Alignment::Center)
+            )
+            .width(Length::Fill)
+            .padding([20.0, 24.0])
+            .style(header_style),
+            // Content area
+            scrollable(
+                container(
+                    column![
+                        container(
+                            white_text("Text Cleanup", 16)
+                                .style(|_theme| iced::widget::text::Style {
+                                    color: Some(Color::WHITE),
+                                })
+                        )
+                        .width(Length::Fill)
+                        .padding([20.0, 24.0]),
+                        container(
+                            white_text(
+                    "Insight Reader pre-processes text to remove noise and improve punctuation before sending it to the Text-to-Speech engine.
+
+This feature enables the creation of pleasant audio when reading websites, conversations on platforms like Slack, and structured text such as tables.",
+                                13
+                            )
+                            .style(|_theme| iced::widget::text::Style {
+                                color: Some(Color::from_rgba(1.0, 1.0, 1.0, 0.85)),
+                            })
+                        )
+                        .width(Length::Fill)
+                        .padding([0.0, 24.0]),
+                        Space::new().height(Length::Fixed(20.0)),
+                    ]
+                    .spacing(12)
+                )
+                .width(Length::Fill)
+                .style(|_theme| container::Style {
+                    background: Some(Background::Color(Color::from_rgb(0.12, 0.12, 0.14))),
+                    ..Default::default()
+                }),
+            )
+            .width(Length::Fill)
+            .height(Length::Fill),
+        ]
+        .spacing(0)
+        .width(Length::Fill)
+        .height(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .center_x(Length::Fill)
+    .center_y(Length::Fill)
+    .style(modal_content_style)
+    .into()
+}
+
+/// Better OCR information modal window
+pub fn ocr_info_window_view<'a>(_app: &'a App) -> Element<'a, Message> {
+    let close_button = button(
+        container(white_text("✕", 18))
+            .width(Length::Fixed(28.0))
+            .height(Length::Fixed(28.0))
+            .center_x(Length::Fixed(28.0))
+            .center_y(Length::Fixed(28.0)),
+    )
+    .style(close_button_style)
+    .on_press(Message::CloseOCRInfo);
+
+    container(
+        column![
+            // Header bar
+            container(
+                row![
+                    white_text("Better OCR Information", 20)
+                        .style(|_theme| iced::widget::text::Style {
+                            color: Some(Color::WHITE),
+                        }),
+                    Space::new().width(Length::Fill),
+                    close_button,
+                ]
+                .width(Length::Fill)
+                .align_y(Alignment::Center)
+            )
+            .width(Length::Fill)
+            .padding([20.0, 24.0])
+            .style(header_style),
+            // Content area
+            scrollable(
+                container(
+                    column![
+                        container(
+                            white_text("Better OCR - Cloud Service", 16)
+                                .style(|_theme| iced::widget::text::Style {
+                                    color: Some(Color::WHITE),
+                                })
+                        )
+                        .width(Length::Fill)
+                        .padding([20.0, 24.0]),
+                        container(
+                            white_text(
+                                "Better OCR is a cloud service offered by Insight Reader that combines OCR and AI to nearly eliminate errors in screenshots and deliver exceptional accuracy on scanned documents and handwritten text.",
+                                13
+                            )
+                            .style(|_theme| iced::widget::text::Style {
+                                color: Some(Color::from_rgba(1.0, 1.0, 1.0, 0.85)),
+                            })
+                        )
+                        .width(Length::Fill)
+                        .padding([0.0, 24.0]),
                         Space::new().height(Length::Fixed(20.0)),
                     ]
                     .spacing(12)

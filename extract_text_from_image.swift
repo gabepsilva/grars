@@ -27,22 +27,30 @@ guard let imageURL = URL(fileURLWithPath: imagePath) as URL?,
 
 let requestHandler = VNImageRequestHandler(data: imageData, options: [:])
 let textRequest = VNRecognizeTextRequest()
-textRequest.recognitionLevel = .accurate
+textRequest.recognitionLevel = .fast
 
-// Configure recognition languages to support Chinese and other common languages
-// This significantly improves accuracy for non-Latin scripts like Chinese
+// Configure recognition languages to support all available languages
+// Supported languages as of macOS 13.0/iOS 16.0+:
+// English, French, Italian, German, Spanish, Portuguese (Brazil),
+// Chinese (Simplified/Traditional), Cantonese (Simplified/Traditional),
+// Korean, Japanese, Russian, Ukrainian
+// Note: To get the exact list at runtime, use:
+// try textRequest.supportedRecognitionLanguages(for: .fast, revision: VNRecognizeTextRequestRevision1)
 textRequest.recognitionLanguages = [
-    "zh-Hans",  // Simplified Chinese
-    "zh-Hant",  // Traditional Chinese
     "en-US",    // English
-    "ja-JP",    // Japanese
-    "ko-KR",    // Korean
     "fr-FR",    // French
+    "it-IT",    // Italian
     "de-DE",    // German
     "es-ES",    // Spanish
-    "it-IT",    // Italian
     "pt-BR",    // Portuguese
+    "zh-Hans",  // Simplified Chinese
+    "zh-Hant",  // Traditional Chinese
+    "yue-Hans", // Simplified Cantonese
+    "yue-Hant", // Traditional Cantonese
+    "ko-KR",    // Korean
+    "ja-JP",    // Japanese
     "ru-RU",    // Russian
+    "uk-UA",    // Ukrainian
 ]
 
 // Enable automatic language detection as fallback

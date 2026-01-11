@@ -7,7 +7,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::config;
 use crate::logging;
-use crate::model::{App, Message, PlaybackState, TTSBackend};
+use crate::model::{App, Message, OCRBackend, PlaybackState, TTSBackend};
 use crate::providers::{PiperTTSProvider, PollyTTSProvider, TTSProvider};
 use crate::system;
 
@@ -427,6 +427,12 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             if app.screenshot_window_id == Some(id) {
                 app.screenshot_window_id = None;
             }
+            if app.ocr_info_window_id == Some(id) {
+                app.ocr_info_window_id = None;
+            }
+            if app.text_cleanup_info_window_id == Some(id) {
+                app.text_cleanup_info_window_id = None;
+            }
             if app.current_window_id == Some(id) {
                 app.current_window_id = None;
             }
@@ -604,6 +610,71 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             open_url(url);
             info!("Opening AWS Polly pricing URL in browser");
             Task::none()
+        }
+        Message::OCRBackendSelected(backend) => {
+            // Prevent selection of BetterOCR since it's not available yet
+            if backend == OCRBackend::BetterOCR {
+                debug!("Better OCR is not available yet, ignoring selection");
+                return Task::none();
+            }
+            info!(?backend, "OCR backend selected");
+            app.selected_ocr_backend = backend;
+            config::save_ocr_backend(backend);
+            Task::none()
+        }
+        Message::OpenOCRInfo => {
+            // Prevent opening multiple info windows
+            if app.ocr_info_window_id.is_some() {
+                debug!("OCR info window already open, ignoring request");
+                return Task::none();
+            }
+            
+            debug!("Opening Better OCR info window");
+            let (window_id, task) = window::open(window::Settings {
+                size: Size::new(500.0, 300.0),
+                resizable: false,
+                decorations: false,
+                transparent: false,
+                visible: true,
+                position: window::Position::Centered,
+                ..Default::default()
+            });
+            app.ocr_info_window_id = Some(window_id);
+            task.map(Message::WindowOpened)
+        }
+        Message::CloseOCRInfo => {
+            if let Some(window_id) = app.ocr_info_window_id.take() {
+                window::close(window_id)
+            } else {
+                Task::none()
+            }
+        }
+        Message::OpenTextCleanupInfo => {
+            // Prevent opening multiple info windows
+            if app.text_cleanup_info_window_id.is_some() {
+                debug!("Text Cleanup info window already open, ignoring request");
+                return Task::none();
+            }
+            
+            debug!("Opening Text Cleanup info window");
+            let (window_id, task) = window::open(window::Settings {
+                size: Size::new(500.0, 300.0),
+                resizable: false,
+                decorations: false,
+                transparent: false,
+                visible: true,
+                position: window::Position::Centered,
+                ..Default::default()
+            });
+            app.text_cleanup_info_window_id = Some(window_id);
+            task.map(Message::WindowOpened)
+        }
+        Message::CloseTextCleanupInfo => {
+            if let Some(window_id) = app.text_cleanup_info_window_id.take() {
+                window::close(window_id)
+            } else {
+                Task::none()
+            }
         }
         Message::VoiceSelected(voice_key) => {
             info!(voice = %voice_key, "Voice selected");
