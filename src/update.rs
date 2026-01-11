@@ -424,6 +424,9 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             if app.polly_info_window_id == Some(id) {
                 app.polly_info_window_id = None;
             }
+            if app.screenshot_window_id == Some(id) {
+                app.screenshot_window_id = None;
+            }
             if app.current_window_id == Some(id) {
                 app.current_window_id = None;
             }
@@ -668,6 +671,150 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 }
             }
             Task::none()
+        }
+        Message::ScreenshotRequested => {
+            info!("Screenshot button clicked, starting region selection");
+            // Spawn async task to capture screenshot region
+            Task::perform(
+                async {
+                    debug!("Starting async screenshot capture task");
+                    // Use spawn_blocking for the blocking shell command
+                    let result = tokio::task::spawn_blocking(|| {
+                        debug!("Executing capture_region in blocking thread");
+                        crate::system::capture_region()
+                    })
+                    .await;
+                    debug!("Screenshot capture task completed");
+                    result.unwrap_or_else(|e| {
+                        tracing::warn!(error = %e, "Failed to join blocking task for screenshot capture");
+                        Err(format!("Task join error: {}", e))
+                    })
+                },
+                Message::ScreenshotCaptured,
+            )
+        }
+        Message::ScreenshotCaptured(result) => {
+            match result {
+                Ok(file_path) => {
+                    info!(path = %file_path, "Screenshot captured successfully");
+                    app.screenshot_path = Some(file_path.clone());
+                    app.status_text = Some("Extracting text from image...".to_string());
+                    
+                    // Automatically extract text from the screenshot
+                    let file_path_clone = file_path.clone();
+                    let extract_task = Task::perform(
+                        async move {
+                            debug!("Starting async text extraction from screenshot");
+                            // Use spawn_blocking for the blocking shell command
+                            let result = tokio::task::spawn_blocking(move || {
+                                debug!("Executing extract_text_from_image in blocking thread");
+                                crate::system::extract_text_from_image(&file_path_clone)
+                            })
+                            .await;
+                            debug!("Text extraction task completed");
+                            result.unwrap_or_else(|e| {
+                                tracing::warn!(error = %e, "Failed to join blocking task for text extraction");
+                                Err(format!("Task join error: {}", e))
+                            })
+                        },
+                        Message::ScreenshotTextExtracted,
+                    );
+                    
+                    // Automatically open the screenshot viewer window
+                    let window_task = if app.screenshot_window_id.is_none() {
+                        let (window_id, task) = window::open(window::Settings {
+                            size: Size::new(800.0, 600.0),
+                            resizable: true,
+                            decorations: true,
+                            transparent: false,
+                            visible: true,
+                            position: window::Position::Centered,
+                            ..Default::default()
+                        });
+                        app.screenshot_window_id = Some(window_id);
+                        task.map(Message::WindowOpened)
+                    } else {
+                        Task::none()
+                    };
+                    
+                    return Task::batch([extract_task, window_task]);
+                }
+                Err(e) => {
+                    // Don't show error for user cancellation
+                    if e.contains("cancelled") {
+                        debug!("User cancelled screenshot selection");
+                    } else {
+                        error!(error = %e, "Screenshot capture failed");
+                        app.error_message = Some(format!("Screenshot failed: {}", e));
+                    }
+                }
+            }
+            Task::none()
+        }
+        Message::ScreenshotTextExtracted(result) => {
+            match result {
+                Ok(extracted_text) => {
+                    info!(bytes = extracted_text.len(), "Text extracted from screenshot successfully");
+                    info!(
+                        text = %extracted_text,
+                        "Extracted text from screenshot (before TTS)"
+                    );
+                    app.status_text = Some("Text extracted from image".to_string());
+                    
+                    // Process the extracted text for TTS (same flow as selected text)
+                    if app.main_window_id.is_some() {
+                        return process_text_for_tts(app, extracted_text, "ScreenshotTextExtracted");
+                    } else {
+                        // Window not ready yet, store text for WindowOpened handler
+                        app.pending_text = Some(extracted_text);
+                        trace!("Window not ready yet, extracted text stored for later initialization");
+                    }
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to extract text from screenshot");
+                    // Don't show error if no text was found (image might not contain text)
+                    if e.contains("No text found") {
+                        app.status_text = Some("No text found in image".to_string());
+                    } else {
+                        app.error_message = Some(format!("Text extraction failed: {}", e));
+                        app.status_text = Some("Text extraction failed".to_string());
+                    }
+                }
+            }
+            Task::none()
+        }
+        Message::OpenScreenshotViewer => {
+            // Prevent opening multiple screenshot windows
+            if app.screenshot_window_id.is_some() {
+                debug!("Screenshot window already open, ignoring request");
+                return Task::none();
+            }
+            
+            // Only open if we have a screenshot
+            if app.screenshot_path.is_none() {
+                debug!("No screenshot available to display");
+                return Task::none();
+            }
+            
+            debug!("Opening screenshot viewer window");
+            let (window_id, task) = window::open(window::Settings {
+                size: Size::new(800.0, 600.0),
+                resizable: true,
+                decorations: true,
+                transparent: false,
+                visible: true,
+                position: window::Position::Centered,
+                ..Default::default()
+            });
+            app.screenshot_window_id = Some(window_id);
+            task.map(Message::WindowOpened)
+        }
+        Message::CloseScreenshotViewer => {
+            if let Some(window_id) = app.screenshot_window_id.take() {
+                window::close(window_id)
+            } else {
+                Task::none()
+            }
         }
     }
 }

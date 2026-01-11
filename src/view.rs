@@ -1,7 +1,7 @@
 //! UI rendering logic
 
 use iced::widget::{button, checkbox, column, container, mouse_area, progress_bar, radio, row, scrollable, svg, text, Space};
-use iced::{Alignment, Background, Color, Element, Length};
+use iced::{Alignment, Background, Color, ContentFit, Element, Length};
 
 use crate::model::{App, LanguageInfo, LogLevel, Message, PlaybackState, TTSBackend};
 use crate::styles::{
@@ -206,6 +206,7 @@ const SVG_PAUSE: &[u8] = include_bytes!("../assets/icons/pause.svg");
 const SVG_STOP: &[u8] = include_bytes!("../assets/icons/stop.svg");
 const SVG_VOLUME: &[u8] = include_bytes!("../assets/icons/volume.svg");
 const SVG_SETTINGS: &[u8] = include_bytes!("../assets/icons/settings.svg");
+const SVG_CAMERA: &[u8] = include_bytes!("../assets/icons/camera.svg");
 
 /// Calculate bar height from frequency band amplitude (0.0-1.0).
 fn bar_height(amplitude: f32) -> f32 {
@@ -257,6 +258,10 @@ fn volume_icon(size: f32) -> svg::Svg<'static> {
 
 fn settings_icon(size: f32) -> svg::Svg<'static> {
     icon_from_bytes(SVG_SETTINGS, size)
+}
+
+fn camera_icon(size: f32) -> svg::Svg<'static> {
+    icon_from_bytes(SVG_CAMERA, size)
 }
 
 /// Helper to create white text with consistent styling.
@@ -383,7 +388,7 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
                 let flag_emoji = get_flag_emoji(lang_code);
                 let label = format!("{} {} ({})", flag_emoji, lang_info.name_english, lang_code);
                 let lang_code_clone = lang_code.clone();
-                let is_selected = app.selected_language.as_ref().map(|s| s == lang_code).unwrap_or(false);
+                let is_selected = app.selected_language.as_deref() == Some(lang_code);
                 
                 // Create button with owned string - clicking opens voice selection immediately
                 let lang_button = button(
@@ -519,7 +524,7 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
                 let flag_emoji = get_flag_emoji(lang_code);
                 let label = format!("{} {} ({})", flag_emoji, lang_info.name_english, lang_code);
                 let lang_code_clone = lang_code.clone();
-                let is_selected = app.selected_language.as_ref().map(|s| s == lang_code).unwrap_or(false);
+                let is_selected = app.selected_language.as_deref() == Some(lang_code);
                 
                 // Create button with owned string - clicking opens voice selection immediately
                 let lang_button = button(
@@ -781,6 +786,7 @@ pub fn main_view(app: &App) -> Element<'_, Message> {
         circle_button(white_text("+5s", 12), Message::SkipForward),
         circle_button(play_pause_icon, Message::PlayPause),
         circle_button(stop_icon(16.0), Message::Stop),
+        circle_button(camera_icon(16.0), Message::ScreenshotRequested),
     ]
     .spacing(6)
     .align_y(Alignment::Center);
@@ -889,9 +895,9 @@ pub fn voice_selection_window_view<'a>(app: &'a App) -> Element<'a, Message> {
                     for voice in language_voices {
                         let voice_key = voice.key.clone();
                         let voice_name = format!("{} ({})", voice.name, voice.quality);
-                        let is_selected = app.selected_voice.as_ref().map(|s| s.as_str() == voice_key.as_str()).unwrap_or(false);
+                        let is_selected = app.selected_voice.as_deref() == Some(&voice_key);
                         let is_downloaded = crate::voices::download::is_voice_downloaded(&voice_key);
-                        let is_downloading = app.downloading_voice.as_ref().map(|s| s == &voice_key).unwrap_or(false);
+                        let is_downloading = app.downloading_voice.as_deref() == Some(&voice_key);
                 
                 // Voice row: checkbox + name + quality + download/select button
                 let voice_key_clone = voice_key.clone();
@@ -1015,7 +1021,7 @@ pub fn voice_selection_window_view<'a>(app: &'a App) -> Element<'a, Message> {
                         let voice_key = format!("{}:{}", voice.id, voice.engine);
                         let engine_display = engine_display_name(&voice.engine);
                         let voice_name = format!("{} ({}, {})", voice.name, voice.gender, engine_display);
-                        let is_selected = app.selected_polly_voice.as_ref().map(|s| s.as_str() == voice_key.as_str()).unwrap_or(false);
+                        let is_selected = app.selected_polly_voice.as_deref() == Some(&voice_key);
                         
                         // AWS voices are always available (no download needed)
                         let voice_key_clone = voice_key.clone();
@@ -1070,7 +1076,7 @@ pub fn voice_selection_window_view<'a>(app: &'a App) -> Element<'a, Message> {
     };
 
     // Get language name for header (outside the voice_list scope)
-    let language_name: String = if let Some(ref lang_code) = app.selected_language.as_ref() {
+    let language_name: String = if let Some(lang_code) = &app.selected_language {
         let flag_emoji = get_flag_emoji(lang_code);
         
         let lang_info: Option<LanguageInfo> = match app.selected_backend {
@@ -1078,12 +1084,12 @@ pub fn voice_selection_window_view<'a>(app: &'a App) -> Element<'a, Message> {
                 use crate::voices;
                 voices::get_available_languages(v)
                     .into_iter()
-                    .find(|(code, _)| code.as_str() == lang_code.as_str())
+                    .find(|(code, _)| code == lang_code)
                     .map(|(_, info)| info)
             }),
             TTSBackend::AwsPolly => app.polly_voices.as_ref().and_then(|v| {
                 v.values()
-                    .find(|voice| voice.language.code.as_str() == lang_code.as_str())
+                    .find(|voice| voice.language.code == *lang_code)
                     .map(|voice| voice.language.clone())
             }),
         };
@@ -1236,6 +1242,86 @@ pub fn polly_info_window_view<'a>(_app: &'a App) -> Element<'a, Message> {
             )
             .width(Length::Fill)
             .height(Length::Fill),
+        ]
+        .spacing(0)
+        .width(Length::Fill)
+        .height(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .center_x(Length::Fill)
+    .center_y(Length::Fill)
+    .style(modal_content_style)
+    .into()
+}
+
+/// Screenshot viewer window - displays the captured screenshot
+pub fn screenshot_viewer_view<'a>(app: &'a App) -> Element<'a, Message> {
+    let close_button = button(
+        container(white_text("✕", 18))
+            .width(Length::Fixed(28.0))
+            .height(Length::Fixed(28.0))
+            .center_x(Length::Fixed(28.0))
+            .center_y(Length::Fixed(28.0)),
+    )
+    .style(close_button_style)
+    .on_press(Message::CloseScreenshotViewer);
+
+    // Display the screenshot image if available
+    let image_content: Element<'a, Message> = if let Some(ref screenshot_path) = app.screenshot_path {
+        // Load image from file path using Iced's image widget
+        use iced::widget::image::{Image, Handle};
+        let image_handle = Handle::from_path(screenshot_path);
+        let img = Image::new(image_handle)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .content_fit(ContentFit::Contain);
+        
+        container(img)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(20)
+            .into()
+    } else {
+        container(
+            white_text("No screenshot available", 14)
+                .style(|_theme| iced::widget::text::Style {
+                    color: Some(Color::from_rgba(1.0, 1.0, 1.0, 0.6)),
+                })
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into()
+    };
+
+    container(
+        column![
+            // Header bar
+            container(
+                row![
+                    white_text("Screenshot", 20)
+                        .style(|_theme| iced::widget::text::Style {
+                            color: Some(Color::WHITE),
+                        }),
+                    Space::new().width(Length::Fill),
+                    close_button,
+                ]
+                .width(Length::Fill)
+                .align_y(Alignment::Center)
+            )
+            .width(Length::Fill)
+            .padding([20.0, 24.0])
+            .style(header_style),
+            // Image content area
+            container(image_content)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|_theme| container::Style {
+                    background: Some(Background::Color(Color::from_rgb(0.12, 0.12, 0.14))),
+                    ..Default::default()
+                }),
         ]
         .spacing(0)
         .width(Length::Fill)

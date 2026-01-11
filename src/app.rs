@@ -18,7 +18,7 @@ pub fn new() -> (App, Task<Message>) {
     // Open the main window (daemon doesn't open one by default)
     // This happens synchronously but is very fast - just window creation
     let (_main_window_id, open_task) = window::open(window::Settings {
-        size: Size::new(360.0, 70.0),
+        size: Size::new(410.0, 70.0),
         resizable: false,
         decorations: false,
         transparent: true,
@@ -84,16 +84,14 @@ pub fn new() -> (App, Task<Message>) {
 }
 
 pub fn title(app: &App, window: window::Id) -> String {
-    // Set different titles for different windows
-    if app.settings_window_id == Some(window) {
-        String::from("Settings")
-    } else if app.voice_selection_window_id == Some(window) {
-        String::from("Select Voice")
-    } else if app.polly_info_window_id == Some(window) {
-        String::from("AWS Polly Pricing Information")
-    } else {
-        String::from("Insight Reader")
+    match window {
+        w if app.settings_window_id == Some(w) => "Settings",
+        w if app.voice_selection_window_id == Some(w) => "Select Voice",
+        w if app.polly_info_window_id == Some(w) => "AWS Polly Pricing Information",
+        w if app.screenshot_window_id == Some(w) => "Screenshot",
+        _ => "Insight Reader",
     }
+    .to_string()
 }
 
 pub fn update(app: &mut App, message: Message) -> Task<Message> {
@@ -114,6 +112,11 @@ pub fn view(app: &App, window: window::Id) -> Element<'_, Message> {
     // Show AWS Polly info modal if this is the info modal window
     if app.polly_info_window_id == Some(window) {
         return view::polly_info_window_view(app);
+    }
+    
+    // Show screenshot viewer if this is the screenshot window
+    if app.screenshot_window_id == Some(window) {
+        return view::screenshot_viewer_view(app);
     }
     
     view::main_view(app)

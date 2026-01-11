@@ -55,6 +55,11 @@ pub enum Message {
     OpenPollyInfo, // Open AWS Polly pricing info modal
     ClosePollyInfo, // Close AWS Polly pricing info modal
     OpenPollyPricingUrl, // Open AWS Polly pricing URL in browser
+    ScreenshotRequested, // User clicked screenshot button
+    ScreenshotCaptured(Result<String, String>), // Screenshot result (file path or error)
+    ScreenshotTextExtracted(Result<String, String>), // Text extracted from screenshot (text or error)
+    OpenScreenshotViewer, // Open screenshot viewer window
+    CloseScreenshotViewer, // Close screenshot viewer window
 }
 
 /// Voice metadata from piper-voices repository
@@ -131,6 +136,10 @@ pub struct App {
     pub downloading_voice: Option<String>,
     /// AWS Polly info modal window ID
     pub polly_info_window_id: Option<window::Id>,
+    /// Path to the captured screenshot file
+    pub screenshot_path: Option<String>,
+    /// Screenshot viewer window ID
+    pub screenshot_window_id: Option<window::Id>,
 }
 
 impl Default for App {
@@ -160,6 +169,8 @@ impl Default for App {
             voice_selection_window_id: None,
             downloading_voice: None,
             polly_info_window_id: None,
+            screenshot_path: None,
+            screenshot_window_id: None,
         }
     }
 }
@@ -196,6 +207,8 @@ impl App {
             voice_selection_window_id: None,
             downloading_voice: None,
             polly_info_window_id: None,
+            screenshot_path: None,
+            screenshot_window_id: None,
         }
     }
 }
