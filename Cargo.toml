@@ -22,4 +22,5 @@ reqwest = { version = "0.12", features = ["json"] }  # HTTP client for Natural R
 pulldown-cmark = "0.9"  # Markdown parser for stripping formatting
 core-foundation = "0.9" # Core Foundation types for macOS Accessibility API
 md5 = "0.7"            # MD5 checksum verification for voice downloads
-arboard = "3.2"        # Cross-platform clipboard library
+arboard = { version = "3.2", features = ["wayland-data-control"] }  # Cross-platform clipboard library
+open = "5.0"            # Cross-platform URL/file opening

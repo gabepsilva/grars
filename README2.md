@@ -119,8 +119,6 @@ wget -qO- https://insightreader.xyz/install.sh | bash
    - **System dependencies**:
      - `python3` and `python3-venv` (for Piper TTS)
      - `espeak-ng` (for text processing)
-     - **Linux**: `wl-clipboard` (Wayland) or `xclip` (X11) for clipboard access
-     - **macOS**: No additional dependencies (uses built-in `osascript` and `pbpaste`)
 
 2. **Clone and build**:
    ```bash
@@ -210,7 +208,6 @@ Enable text cleanup in settings to:
 - Verify AWS credentials have Polly permissions
 
 **"Clipboard not working"**
-- **Linux Wayland**: Ensure `wl-clipboard` is installed
 - **macOS**: 
   - Grant accessibility permissions: **System Preferences/Settings → Security & Privacy → Privacy → Accessibility**
   - Add Insight Reader (or Terminal if running from terminal) to the allowed apps list

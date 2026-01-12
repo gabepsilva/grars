@@ -69,7 +69,7 @@ wget -qO- https://insightreader.xyz/install.sh | bash
 - **System dependencies** (automatically installed by install script):
   - `python3` and `python3-venv` (for Piper TTS)
   - `espeak-ng` (for text processing)
-  - **Linux**: `wl-clipboard` (Wayland) or `xclip` (X11) for clipboard access
+  - **Linux**: No additional dependencies (clipboard handled by `arboard` crate)
   - **macOS**: No additional dependencies (clipboard handled by `arboard` crate)
 
 #### Build from Source
@@ -224,8 +224,7 @@ Log level can be changed in the settings window.
 
 ### Clipboard not working
 
-- **Linux Wayland**: Ensure `wl-clipboard` is installed
-- **Linux X11**: Ensure `xclip` is installed
+- **Linux/macOS**: Clipboard support is handled by the `arboard` crate (no external dependencies needed)
 - **macOS**: 
   - Grant accessibility permissions: **System Preferences/Settings → Security & Privacy → Privacy → Accessibility**
   - Add Insight Reader (or Terminal if running from terminal) to the allowed apps list

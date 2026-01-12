@@ -73,25 +73,10 @@ fn clear_loading_state(app: &mut App) {
     app.status_text = None;
 }
 
-/// Open a URL in the default browser (platform-specific).
+/// Open a URL in the default browser (cross-platform).
 fn open_url(url: &str) {
-    #[cfg(target_os = "windows")]
-    {
-        let _ = std::process::Command::new("cmd")
-            .args(&["/c", "start", url])
-            .spawn();
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let _ = std::process::Command::new("open")
-            .arg(url)
-            .spawn();
-    }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    {
-        let _ = std::process::Command::new("xdg-open")
-            .arg(url)
-            .spawn();
+    if let Err(e) = open::that(url) {
+        error!("Failed to open URL '{}': {}", url, e);
     }
 }
 

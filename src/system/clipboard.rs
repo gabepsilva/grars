@@ -1,10 +1,6 @@
 //! Clipboard and selection reading utilities
 
 use tracing::{debug, info, warn};
-#[cfg(target_os = "linux")]
-use std::process::Command;
-#[cfg(target_os = "linux")]
-use tracing::trace;
 
 /// Creates a preview string for logging (first 200 chars).
 pub(crate) fn text_preview(text: &str) -> String {
@@ -16,7 +12,7 @@ pub(crate) fn text_preview(text: &str) -> String {
 }
 
 /// Gets the currently selected text.
-/// - On Linux: Uses wl-paste for Wayland, xclip for X11 (PRIMARY selection)
+/// - On Linux: Uses arboard to read from PRIMARY selection first, falls back to clipboard
 /// - On macOS: Uses arboard to read from clipboard
 /// - On other platforms: Returns None
 pub fn get_selected_text() -> Option<String> {
@@ -37,103 +33,75 @@ pub fn get_selected_text() -> Option<String> {
     }
 }
 
+/// Helper to process and return trimmed text if non-empty.
+fn process_text(text: String, source: &str) -> Option<String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        debug!("{} is empty", source);
+        None
+    } else {
+        info!(bytes = trimmed.len(), "Successfully retrieved text from {}", source);
+        debug!(text = %text_preview(trimmed), "Captured text content");
+        Some(trimmed.to_owned())
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn get_selected_text_linux() -> Option<String> {
-    let try_cmd = |cmd: &str, args: &[&str]| -> Option<String> {
-        trace!(cmd, ?args, "Trying clipboard command");
-        
-        let output = match Command::new(cmd).args(args).output() {
-            Ok(output) => output,
-            Err(e) => {
-                warn!(cmd, error = %e, "Failed to execute clipboard command");
-                return None;
-            }
-        };
-        
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            warn!(
-                cmd,
-                code = ?output.status.code(),
-                stderr = %stderr.trim(),
-                "Clipboard command failed"
-            );
-            return None;
+    use arboard::{Clipboard, GetExtLinux, LinuxClipboardKind};
+    
+    info!("Attempting to read selected text (PRIMARY selection, fallback to clipboard)");
+    
+    let mut clipboard = Clipboard::new().ok()?;
+    
+    // First attempt: Try PRIMARY selection (selected text)
+    if let Ok(text) = clipboard.get().clipboard(LinuxClipboardKind::Primary).text() {
+        if let Some(result) = process_text(text, "PRIMARY selection") {
+            return Some(result);
         }
-        
-        let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if text.is_empty() {
-            trace!(cmd, "Clipboard command returned empty text");
-            return None;
-        }
-        
-        Some(text)
-    };
-
-    // Try wl-paste first (Wayland), fallback to xclip (X11)
-    info!("Attempting to read selected text from clipboard/selection");
-    let result = try_cmd("wl-paste", &["--primary", "--no-newline"])
-        .or_else(|| {
-            debug!("wl-paste failed, trying xclip");
-            try_cmd("xclip", &["-selection", "primary", "-o"])
-        });
-
-    if let Some(ref text) = result {
-        info!(bytes = text.len(), "Successfully retrieved selected text");
-        debug!(text = %text_preview(text), "Captured text content");
+        debug!("PRIMARY selection is empty, falling back to clipboard");
     } else {
-        warn!("No text available from clipboard/selection (no text selected or commands failed)");
+        debug!("PRIMARY selection unavailable, falling back to clipboard");
     }
-
-    result
+    
+    // Fallback: Try regular clipboard
+    clipboard.get_text()
+        .ok()
+        .and_then(|text| process_text(text, "clipboard (fallback)"))
 }
 
 #[cfg(target_os = "macos")]
 fn get_selected_text_macos() -> Option<String> {
     use arboard::Clipboard;
     
-    info!("Attempting to read text from macOS clipboard using arboard");
-    
-    let mut clipboard = match Clipboard::new() {
-        Ok(clipboard) => clipboard,
-        Err(e) => {
-            warn!(error = %e, "Failed to initialize clipboard");
-            return None;
-        }
-    };
-    
-    match clipboard.get_text() {
-        Ok(text) => {
-            let trimmed = text.trim();
-            if trimmed.is_empty() {
-                debug!("Clipboard is empty");
-                None
-            } else {
-                info!(bytes = trimmed.len(), "Successfully retrieved text from clipboard");
-                debug!(text = %text_preview(trimmed), "Captured text content");
-                Some(trimmed.to_owned())
-            }
-        }
-        Err(e) => {
-            warn!(error = %e, "Failed to read from clipboard");
-            None
-        }
-    }
+    Clipboard::new()
+        .ok()?
+        .get_text()
+        .ok()
+        .and_then(|text| process_text(text, "clipboard"))
 }
 
 /// Copies text to the clipboard.
 /// - On macOS: Uses arboard
-/// - On Linux: Uses wl-copy for Wayland, xclip for X11
+/// - On Linux: Uses arboard
 /// - On other platforms: Returns an error
 pub fn copy_to_clipboard(text: &str) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
-        copy_to_clipboard_macos(text)
-    }
-    
-    #[cfg(target_os = "linux")]
-    {
-        copy_to_clipboard_linux(text)
+        use arboard::Clipboard;
+        
+        let mut clipboard = Clipboard::new().map_err(|e| {
+            warn!(error = %e, "Failed to initialize clipboard");
+            format!("Failed to initialize clipboard: {}", e)
+        })?;
+        
+        clipboard.set_text(text).map_err(|e| {
+            warn!(error = %e, "Failed to copy to clipboard");
+            format!("Failed to copy to clipboard: {}", e)
+        })?;
+        
+        info!(bytes = text.len(), "Successfully copied text to clipboard");
+        Ok(())
     }
     
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
@@ -143,77 +111,8 @@ pub fn copy_to_clipboard(text: &str) -> Result<(), String> {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn copy_to_clipboard_macos(text: &str) -> Result<(), String> {
-    use arboard::Clipboard;
-    
-    info!("Copying text to macOS clipboard using arboard");
-    
-    let mut clipboard = Clipboard::new().map_err(|e| {
-        warn!(error = %e, "Failed to initialize clipboard");
-        format!("Failed to initialize clipboard: {}", e)
-    })?;
-    
-    clipboard.set_text(text).map_err(|e| {
-        warn!(error = %e, "Failed to copy to clipboard");
-        format!("Failed to copy to clipboard: {}", e)
-    })?;
-    
-    info!(bytes = text.len(), "Successfully copied text to clipboard");
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-fn copy_to_clipboard_linux(text: &str) -> Result<(), String> {
-    use std::io::Write;
-    
-    let try_cmd = |cmd: &str, args: &[&str]| -> Result<(), String> {
-        trace!(cmd, ?args, "Trying clipboard copy command");
-        
-        let mut child = match Command::new(cmd).args(args).stdin(std::process::Stdio::piped()).spawn() {
-            Ok(child) => child,
-            Err(e) => {
-                warn!(cmd, error = %e, "Failed to execute clipboard copy command");
-                return Err(format!("Failed to execute {}: {}", cmd, e));
-            }
-        };
-        
-        if let Some(mut stdin) = child.stdin.take() {
-            if let Err(e) = stdin.write_all(text.as_bytes()) {
-                warn!(cmd, error = %e, "Failed to write to clipboard command stdin");
-                return Err(format!("Failed to write to {}: {}", cmd, e));
-            }
-        }
-        
-        match child.wait() {
-            Ok(status) => {
-                if status.success() {
-                    info!(cmd, bytes = text.len(), "Successfully copied text to clipboard");
-                    Ok(())
-                } else {
-                    let stderr = format!("{} exited with code: {:?}", cmd, status.code());
-                    warn!(cmd, %stderr, "Clipboard copy command failed");
-                    Err(stderr)
-                }
-            }
-            Err(e) => {
-                warn!(cmd, error = %e, "Failed to wait for clipboard copy process");
-                Err(format!("Failed to wait for {}: {}", cmd, e))
-            }
-        }
-    };
-    
-    // Try wl-copy first (Wayland), fallback to xclip (X11)
-    info!("Attempting to copy text to clipboard");
-    try_cmd("wl-copy", &[])
-        .or_else(|_| {
-            debug!("wl-copy failed, trying xclip");
-            try_cmd("xclip", &["-selection", "clipboard"])
-        })
-}
-
 #[cfg(test)]
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 mod tests {
     use super::*;
     use std::sync::Mutex;
@@ -471,7 +370,7 @@ mod tests {
         
         // Empty clipboard might return None or empty string
         let read_text = get_selected_text();
-        // On macOS, empty clipboard might return None
+        // On macOS/Linux, empty clipboard might return None
         // This is acceptable behavior
         if let Some(text) = read_text {
             assert_eq!(text, "", "Empty string round-trip failed");
@@ -514,7 +413,7 @@ mod tests {
         
         // Try to read - should return None for empty clipboard
         let result = get_selected_text();
-        // On macOS, empty clipboard typically returns None
+        // On macOS/Linux, empty clipboard typically returns None
         // This is acceptable behavior
         if let Some(text) = result {
             assert_eq!(text, "", "Empty clipboard should return empty string or None");

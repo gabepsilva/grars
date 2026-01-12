@@ -53,26 +53,8 @@ check_and_install_dependencies() {
         log_success "tesseract found"
     fi
     
-    # Check clipboard utilities (need at least one for Wayland or X11)
-    local clipboard_available=false
-    if command_exists wl-paste; then
-        log_success "wl-paste found (Wayland clipboard support)"
-        clipboard_available=true
-    else
-        log_warn "wl-paste not found (Wayland clipboard support missing)"
-    fi
-    
-    if command_exists xclip; then
-        log_success "xclip found (X11 clipboard support)"
-        clipboard_available=true
-    else
-        log_warn "xclip not found (X11 clipboard support missing)"
-    fi
-    
-    if [ "$clipboard_available" = false ]; then
-        missing_deps+=("clipboard-utils")
-        log_warn "No clipboard utility found (need wl-clipboard for Wayland or xclip for X11)"
-    fi
+    # Clipboard support is handled by arboard crate (no external dependencies needed)
+    log_success "Clipboard support via arboard crate (no external dependencies required)"
     
     # Check Python3
     local python_missing=false
@@ -133,7 +115,6 @@ check_and_install_dependencies() {
                 [ "$python_missing" = true ] && packages_to_install+=("python" "python-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
                 [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract" "tesseract-data-eng")
-                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via pacman: ${packages_to_install[*]}"
                     sudo pacman -S --needed --noconfirm "${packages_to_install[@]}"
@@ -149,7 +130,6 @@ check_and_install_dependencies() {
                 [ "$venv_missing" = true ] && packages_to_install+=("python3-venv")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
                 [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract-ocr" "libtesseract-dev" "tesseract-ocr-eng")
-                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 # Remove duplicates
                 IFS=" " read -r -a packages_to_install <<< "$(printf '%s\n' "${packages_to_install[@]}" | sort -u | tr '\n' ' ')"
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
@@ -167,7 +147,6 @@ check_and_install_dependencies() {
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
                 [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract" "tesseract-langpack-eng")
-                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via dnf: ${packages_to_install[*]}"
                     sudo dnf install -y "${packages_to_install[@]}"
@@ -176,7 +155,6 @@ check_and_install_dependencies() {
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
                 [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract" "tesseract-langpack-eng")
-                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via yum: ${packages_to_install[*]}"
                     sudo yum install -y "${packages_to_install[@]}"
@@ -191,7 +169,6 @@ check_and_install_dependencies() {
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
                 [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract-ocr" "tesseract-ocr-lang")
-                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via zypper: ${packages_to_install[*]}"
                     sudo zypper install -y "${packages_to_install[@]}"
@@ -206,7 +183,6 @@ check_and_install_dependencies() {
                 [ "$python_missing" = true ] && packages_to_install+=("python3" "py3-pip")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
                 [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract-ocr" "tesseract-ocr-data")
-                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via apk: ${packages_to_install[*]}"
                     sudo apk add --no-cache "${packages_to_install[@]}"
@@ -221,7 +197,6 @@ check_and_install_dependencies() {
                 [ "$python_missing" = true ] && packages_to_install+=("python3")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
                 [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract" "tesseract-ocr-data")
-                [[ " ${missing_deps[@]} " =~ " clipboard-utils " ]] && packages_to_install+=("wl-clipboard" "xclip")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via xbps-install: ${packages_to_install[*]}"
                     sudo xbps-install -S -y "${packages_to_install[@]}"
@@ -264,19 +239,7 @@ check_and_install_dependencies() {
         log_warn "tesseract installation may have failed. OCR functionality may not work."
     fi
     
-    # Verify clipboard utilities
-    local clipboard_ok=false
-    if command_exists wl-paste; then
-        log_success "wl-paste verified (Wayland clipboard support)"
-        clipboard_ok=true
-    fi
-    if command_exists xclip; then
-        log_success "xclip verified (X11 clipboard support)"
-        clipboard_ok=true
-    fi
-    if [ "$clipboard_ok" = false ]; then
-        log_warn "Clipboard utilities installation may have failed. App may not be able to read selected text."
-    fi
+    # Clipboard support is handled by arboard crate (no verification needed)
     
     log_success "Dependencies installed successfully"
 }

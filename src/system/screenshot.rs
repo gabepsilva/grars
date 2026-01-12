@@ -1,5 +1,6 @@
 //! Screenshot and region capture utilities
 
+#[allow(unused_imports)] // These are used in macOS-specific code blocks
 use tracing::{debug, error, info, warn};
 
 /// Captures a screenshot of a selected screen region.
@@ -83,6 +84,7 @@ fn capture_region_macos() -> Result<String, String> {
 /// 
 /// On macOS, uses AppleScript to call the Vision framework for OCR.
 /// Returns the extracted text, or an error message.
+#[allow(unused_variables)] // image_path is used in macOS-specific code
 pub fn extract_text_from_image(image_path: &str) -> Result<String, String> {
     #[cfg(target_os = "macos")]
     {
