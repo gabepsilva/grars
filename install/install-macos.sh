@@ -203,6 +203,44 @@ check_and_install_dependencies() {
     log_success "Dependencies installed successfully"
 }
 
+# Install Swift OCR script
+install_ocr_script() {
+    log_info "Installing OCR script..."
+    
+    # Script location in installation directory bin folder
+    SCRIPT_DIR="$INSTALL_DIR/bin"
+    SCRIPT_FILE="$SCRIPT_DIR/extract_text_from_image.swift"
+    mkdir -p "$SCRIPT_DIR"
+    
+    # Try to copy from local directory first (project root)
+    if [ -f "extract_text_from_image.swift" ]; then
+        log_info "Copying extract_text_from_image.swift from local directory to $SCRIPT_FILE"
+        cp "extract_text_from_image.swift" "$SCRIPT_FILE"
+        chmod +x "$SCRIPT_FILE"
+        log_success "OCR script installed to $SCRIPT_FILE"
+        return 0
+    fi
+    
+    # If not found locally, download from GitHub
+    log_info "extract_text_from_image.swift not found in current directory, downloading from GitHub..."
+    SCRIPT_URL="https://raw.githubusercontent.com/$GITHUB_REPO/master/extract_text_from_image.swift"
+    
+    local temp_script
+    temp_script=$(mktemp)
+    if download_file "$SCRIPT_URL" "$temp_script"; then
+        cp "$temp_script" "$SCRIPT_FILE"
+        chmod +x "$SCRIPT_FILE"
+        rm -f "$temp_script" 2>/dev/null || true
+        log_success "OCR script downloaded and installed to $SCRIPT_FILE"
+        return 0
+    else
+        log_warn "Failed to download extract_text_from_image.swift from GitHub"
+        log_warn "OCR functionality may not work if script is not found at runtime"
+        rm -f "$temp_script" 2>/dev/null || true
+        return 1
+    fi
+}
+
 # Create macOS app bundle and install to Applications
 create_app_bundle() {
     log_info "Creating macOS app bundle..."
@@ -389,6 +427,10 @@ main() {
     install_binary
     create_venv
     install_piper
+    
+    # Install OCR script
+    echo ""
+    install_ocr_script
     
     # Download model if not present (download_model checks if it exists first)
     echo ""

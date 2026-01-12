@@ -45,17 +45,20 @@ check_and_install_dependencies() {
         log_success "espeak-ng found"
     fi
     
-    # Check tesseract (for OCR)
-    if ! command_exists tesseract; then
-        missing_deps+=("tesseract")
-        log_warn "tesseract not found (required for OCR)"
+    # Check EasyOCR (for OCR) - will be installed via pip
+    # We check if python3 and pip are available instead
+    if ! command_exists python3; then
+        # python3 check is already done below, so we'll handle it there
+        log_info "Python3 will be checked separately"
     else
-        log_success "tesseract found"
+        # Check if easyocr is already installed
+        if python3 -c "import easyocr" 2>/dev/null; then
+            log_success "EasyOCR found (already installed)"
+        else
+            log_info "EasyOCR will be installed via pip"
+        fi
     fi
-    
-    # Clipboard support is handled by arboard crate (no external dependencies needed)
-    log_success "Clipboard support via arboard crate (no external dependencies required)"
-    
+
     # Check Python3
     local python_missing=false
     local venv_missing=false
@@ -112,9 +115,8 @@ check_and_install_dependencies() {
     case "$DISTRO_ID" in
         arch|manjaro|endeavouros)
             if command_exists pacman; then
-                [ "$python_missing" = true ] && packages_to_install+=("python" "python-pip")
+                [ "$python_missing" = true ] && packages_to_install+=("python")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
-                [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract" "tesseract-data-eng")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via pacman: ${packages_to_install[*]}"
                     sudo pacman -S --needed --noconfirm "${packages_to_install[@]}"
@@ -126,10 +128,9 @@ check_and_install_dependencies() {
             ;;
         debian|ubuntu|linuxmint|pop)
             if command_exists apt-get; then
-                [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-venv" "python3-pip")
+                [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-venv")
                 [ "$venv_missing" = true ] && packages_to_install+=("python3-venv")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
-                [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract-ocr" "libtesseract-dev" "tesseract-ocr-eng")
                 # Remove duplicates
                 IFS=" " read -r -a packages_to_install <<< "$(printf '%s\n' "${packages_to_install[@]}" | sort -u | tr '\n' ' ')"
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
@@ -144,17 +145,15 @@ check_and_install_dependencies() {
             ;;
         fedora|rhel|centos|rocky|almalinux)
             if command_exists dnf; then
-                [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
+                [ "$python_missing" = true ] && packages_to_install+=("python3")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
-                [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract" "tesseract-langpack-eng")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via dnf: ${packages_to_install[*]}"
                     sudo dnf install -y "${packages_to_install[@]}"
                 fi
             elif command_exists yum; then
-                [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
+                [ "$python_missing" = true ] && packages_to_install+=("python3")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
-                [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract" "tesseract-langpack-eng")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via yum: ${packages_to_install[*]}"
                     sudo yum install -y "${packages_to_install[@]}"
@@ -166,9 +165,8 @@ check_and_install_dependencies() {
             ;;
         opensuse*|sles)
             if command_exists zypper; then
-                [ "$python_missing" = true ] && packages_to_install+=("python3" "python3-pip")
+                [ "$python_missing" = true ] && packages_to_install+=("python3")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
-                [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract-ocr" "tesseract-ocr-lang")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via zypper: ${packages_to_install[*]}"
                     sudo zypper install -y "${packages_to_install[@]}"
@@ -180,9 +178,8 @@ check_and_install_dependencies() {
             ;;
         alpine)
             if command_exists apk; then
-                [ "$python_missing" = true ] && packages_to_install+=("python3" "py3-pip")
+                [ "$python_missing" = true ] && packages_to_install+=("python3")
                 [[ " ${missing_deps[@]} " =~ " espeak-ng " ]] && packages_to_install+=("espeak-ng")
-                [[ " ${missing_deps[@]} " =~ " tesseract " ]] && packages_to_install+=("tesseract-ocr" "tesseract-ocr-data")
                 if [ ${#packages_to_install[@]} -gt 0 ]; then
                     log_info "Installing packages via apk: ${packages_to_install[*]}"
                     sudo apk add --no-cache "${packages_to_install[@]}"
@@ -235,13 +232,50 @@ check_and_install_dependencies() {
         log_warn "espeak-ng installation may have failed. Piper may not work correctly."
     fi
     
-    if ! command_exists tesseract; then
-        log_warn "tesseract installation may have failed. OCR functionality may not work."
-    fi
+    # EasyOCR is now installed in the venv (see install_piper in common-bash.sh)
+    # No need to install it system-wide
     
     # Clipboard support is handled by arboard crate (no verification needed)
     
     log_success "Dependencies installed successfully"
+}
+
+# Install Python OCR script
+install_ocr_script() {
+    log_info "Installing OCR script..."
+    
+    # Script location in installation directory bin folder
+    SCRIPT_DIR="$INSTALL_DIR/bin"
+    SCRIPT_FILE="$SCRIPT_DIR/extract_text_from_image.py"
+    mkdir -p "$SCRIPT_DIR"
+    
+    # Try to copy from local directory first (project root)
+    if [ -f "extract_text_from_image.py" ]; then
+        log_info "Copying extract_text_from_image.py from local directory to $SCRIPT_FILE"
+        cp "extract_text_from_image.py" "$SCRIPT_FILE"
+        chmod +x "$SCRIPT_FILE"
+        log_success "OCR script installed to $SCRIPT_FILE"
+        return 0
+    fi
+    
+    # If not found locally, download from GitHub
+    log_info "extract_text_from_image.py not found in current directory, downloading from GitHub..."
+    SCRIPT_URL="https://raw.githubusercontent.com/$GITHUB_REPO/master/extract_text_from_image.py"
+    
+    local temp_script
+    temp_script=$(mktemp)
+    if download_file "$SCRIPT_URL" "$temp_script"; then
+        cp "$temp_script" "$SCRIPT_FILE"
+        chmod +x "$SCRIPT_FILE"
+        rm -f "$temp_script" 2>/dev/null || true
+        log_success "OCR script downloaded and installed to $SCRIPT_FILE"
+        return 0
+    else
+        log_warn "Failed to download extract_text_from_image.py from GitHub"
+        log_warn "OCR functionality may not work if script is not found at runtime"
+        rm -f "$temp_script" 2>/dev/null || true
+        return 1
+    fi
 }
 
 # Install desktop file and icon
@@ -325,6 +359,10 @@ main() {
     install_binary
     create_venv
     install_piper
+    
+    # Install OCR script
+    echo ""
+    install_ocr_script
     
     # Download model if not present (download_model checks if it exists first)
     echo ""

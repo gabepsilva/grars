@@ -157,6 +157,25 @@ install_piper() {
         exit 1
     fi
     
+    # Install EasyOCR in the same venv for OCR functionality
+    log_info "Installing EasyOCR in virtual environment for OCR functionality..."
+    if python -c "import easyocr" 2>/dev/null; then
+        log_success "EasyOCR is already installed in venv"
+    else
+        log_info "Installing EasyOCR (this may take a while, models will download on first use)..."
+        if pip install --quiet easyocr; then
+            log_success "EasyOCR installed successfully in venv"
+            # Verify installation
+            if python -c "import easyocr" 2>/dev/null; then
+                log_success "EasyOCR installation verified"
+            else
+                log_warn "EasyOCR installed but cannot be imported"
+            fi
+        else
+            log_warn "EasyOCR installation may have failed. OCR functionality may not work."
+        fi
+    fi
+    
     deactivate
 }
 

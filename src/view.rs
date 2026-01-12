@@ -747,9 +747,25 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
     .style(section_style);
 
     // OCR section
+    // Platform-specific OCR backend label
+    let default_ocr_label = {
+        #[cfg(target_os = "macos")]
+        {
+            "Standard OCR (Apple Vision Framework, local)"
+        }
+        #[cfg(target_os = "linux")]
+        {
+            "Standard OCR (EasyOCR, local)"
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            "Standard OCR (local)"
+        }
+    };
+    
     let ocr_controls = column![
         radio(
-            "Standard OCR (Apple Vision Framework, local)",
+            default_ocr_label,
             OCRBackend::Default,
             Some(app.selected_ocr_backend),
             Message::OCRBackendSelected
