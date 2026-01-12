@@ -41,13 +41,12 @@ def main() -> int:
         # pt (Portuguese), ch_sim (Simplified Chinese), ch_tra (Traditional Chinese),
         # ja (Japanese), ko (Korean), ru (Russian), uk (Ukrainian), th (Thai), etc.
         # See https://www.jaided.ai/easyocr/ for full list
-        # gpu=True will use GPU if available, otherwise automatically falls back to CPU
-        # (you may see a warning about CUDA not available, which is normal)
+        # gpu=False uses CPU only (faster install, no CUDA dependencies)
         languages = [
             'en',      # English
             'ch_tra',  # Traditional Chinese
         ]
-        reader = easyocr.Reader(languages, gpu=True)
+        reader = easyocr.Reader(languages, gpu=False)
         
         # Read text from image
         results = reader.readtext(image_path)

@@ -157,11 +157,18 @@ install_piper() {
         exit 1
     fi
     
-    # Install EasyOCR in the same venv for OCR functionality
-    log_info "Installing EasyOCR in virtual environment for OCR functionality..."
+    # Install EasyOCR in the same venv for OCR functionality (CPU-only)
+    log_info "Installing EasyOCR in virtual environment for OCR functionality (CPU-only)..."
     if python -c "import easyocr" 2>/dev/null; then
         log_success "EasyOCR is already installed in venv"
     else
+        log_info "Installing CPU-only PyTorch (required for EasyOCR CPU mode)..."
+        if pip install --quiet torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu; then
+            log_success "CPU-only PyTorch installed"
+        else
+            log_warn "PyTorch installation may have failed, but continuing with EasyOCR install..."
+        fi
+        
         log_info "Installing EasyOCR (this may take a while, models will download on first use)..."
         if pip install --quiet easyocr; then
             log_success "EasyOCR installed successfully in venv"
