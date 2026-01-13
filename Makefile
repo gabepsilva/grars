@@ -1,133 +1,31 @@
 # Makefile for insight-reader
-# Builds release binary with version and platform info
-# Creates versioned artifacts: insight-reader-1.0.0-linux-x86_64, insight-reader-1.0.0-macos-aarch64, etc.
-# Also creates a symlink 'insight-reader' pointing to the versioned binary
+# Builds release binary to target/release/
 
 BINARY_NAME := insight-reader
 RELEASE_DIR := target/release
-BUILD_DIR := build
+BINARY_PATH := $(RELEASE_DIR)/$(BINARY_NAME)
 
-# Detect platform (OS and architecture)
-# If TARGET is set, parse it for cross-compilation; otherwise use native platform
-ifdef TARGET
-	# Parse TARGET triple: arch-vendor-os or arch-vendor-os-env
-	# Extract architecture (first field) and OS (third field)
-	TARGET_ARCH := $(shell echo $(TARGET) | cut -d'-' -f1)
-	TARGET_OS_RAW := $(shell echo $(TARGET) | cut -d'-' -f3)
-	# Use parsed values from TARGET
-	ARCH := $(TARGET_ARCH)
-	# Map target OS to our OS names
-	ifeq ($(TARGET_OS_RAW),darwin)
-		OS := macos
-	else ifeq ($(TARGET_OS_RAW),linux)
-		OS := linux
-	else ifeq ($(TARGET_OS_RAW),windows)
-		OS := windows
-	else ifeq ($(TARGET_OS_RAW),freebsd)
-		OS := freebsd
-	else ifeq ($(TARGET_OS_RAW),openbsd)
-		OS := openbsd
-	else
-		# Default to linux if OS cannot be determined from TARGET
-		OS := linux
-	endif
-else
-	# Native platform detection
-	UNAME_S := $(shell uname -s 2>/dev/null || echo "Unknown")
-	UNAME_M := $(shell uname -m 2>/dev/null || echo "unknown")
-
-	# Map OS names (normalize to lowercase)
-	# Supported: linux, macos, windows, freebsd, openbsd
-	ifeq ($(shell echo $(UNAME_S) | tr A-Z a-z),linux)
-		OS := linux
-	else ifeq ($(shell echo $(UNAME_S) | tr A-Z a-z),darwin)
-		OS := macos
-	else ifeq ($(shell echo $(UNAME_S) | tr A-Z a-z),mingw32)
-		OS := windows
-	else ifeq ($(shell echo $(UNAME_S) | tr A-Z a-z),mingw64)
-		OS := windows
-	else ifeq ($(shell echo $(UNAME_S) | tr A-Z a-z),msys_nt)
-		OS := windows
-	else ifeq ($(shell echo $(UNAME_S) | tr A-Z a-z),cygwin)
-		OS := windows
-	else ifeq ($(shell echo $(UNAME_S) | tr A-Z a-z),freebsd)
-		OS := freebsd
-	else ifeq ($(shell echo $(UNAME_S) | tr A-Z a-z),openbsd)
-		OS := openbsd
-	else
-		# Default to linux if OS cannot be detected
-		OS := linux
-	endif
-
-	# Map architecture names
-	# Supported: x86_64, aarch64, armv7, i686
-	ifeq ($(UNAME_M),x86_64)
-		ARCH := x86_64
-	else ifeq ($(UNAME_M),amd64)
-		ARCH := x86_64
-	else ifeq ($(UNAME_M),aarch64)
-		ARCH := aarch64
-	else ifeq ($(UNAME_M),arm64)
-		ARCH := aarch64
-	else ifeq ($(UNAME_M),armv7l)
-		ARCH := armv7
-	else ifeq ($(UNAME_M),i386)
-		ARCH := i686
-	else ifeq ($(UNAME_M),i686)
-		ARCH := i686
-	else
-		# Default to x86_64 if architecture cannot be detected
-		ARCH := x86_64
-	endif
-endif
-
-# Build artifact name with version and platform
-# Example: insight-reader-linux-x86_64
-ARTIFACT_NAME := $(BINARY_NAME)-$(OS)-$(ARCH)
-ARTIFACT_PATH := $(BUILD_DIR)/$(ARTIFACT_NAME)
-SYMLINK_PATH := $(BUILD_DIR)/$(BINARY_NAME)
-
-.PHONY: all build clean install help copy-ubuntu
+.PHONY: all build clean install help copy-to-vms
 
 all: build
 
-# Build release binary and create versioned artifact
-# Always runs cargo build --release for native target
+# Build release binary
 # Supports cross-compilation via TARGET environment variable
 # Example: TARGET=x86_64-unknown-linux-gnu make build
 build:
 	@if [ -n "$(TARGET)" ]; then \
 		echo "Cross-compiling for target: $(TARGET)"; \
-		echo "Installing target if not present..."; \
 		rustup target add $(TARGET) 2>/dev/null || true; \
 		cargo build --release --target $(TARGET); \
-		RELEASE_BINARY=target/$(TARGET)/release/$(BINARY_NAME); \
+		echo "✓ Built: target/$(TARGET)/release/$(BINARY_NAME)"; \
 	else \
-		echo "Building release binary for native target..."; \
+		echo "Building release binary..."; \
 		cargo build --release; \
-		RELEASE_BINARY=$(RELEASE_DIR)/$(BINARY_NAME); \
+		echo "✓ Built: $(BINARY_PATH)"; \
 	fi
-	@echo "Creating build directory..."
-	@mkdir -p $(BUILD_DIR)
-	@echo "Copying binary to $(ARTIFACT_NAME)..."
-	@if [ -n "$(TARGET)" ]; then \
-		cp target/$(TARGET)/release/$(BINARY_NAME) $(ARTIFACT_PATH); \
-	else \
-		cp $(RELEASE_DIR)/$(BINARY_NAME) $(ARTIFACT_PATH); \
-	fi
-	@chmod +x $(ARTIFACT_PATH)
-	@echo "✓ Built: $(ARTIFACT_PATH)"
-
-# Create symlink to versioned binary (legacy target, now handled in build)
-$(SYMLINK_PATH): $(ARTIFACT_PATH)
-	@echo "Creating symlink $(BINARY_NAME) -> $(ARTIFACT_NAME)..."
-	@cd $(BUILD_DIR) && ln -sf $(ARTIFACT_NAME) $(BINARY_NAME)
-	@echo "✓ Symlink created: $(SYMLINK_PATH)"
 
 # Clean build artifacts
 clean:
-	@echo "Cleaning build directory..."
-	@rm -rf $(BUILD_DIR)
 	@echo "Cleaning cargo build artifacts..."
 	@cargo clean
 	@echo "✓ Cleaned"
@@ -136,38 +34,54 @@ clean:
 install: build
 	@echo "Installing to ~/.local/bin..."
 	@mkdir -p ~/.local/bin
-	@cp $(ARTIFACT_PATH) ~/.local/bin/$(BINARY_NAME)
+	@cp $(BINARY_PATH) ~/.local/bin/$(BINARY_NAME)
 	@chmod +x ~/.local/bin/$(BINARY_NAME)
 	@echo "✓ Installed to ~/.local/bin/$(BINARY_NAME)"
 
-# Copy debug binary to Ubuntu VM (port 2222)
-copy-ubuntu:
-	@echo "Building debug binary..."
-	@cargo build
-	@echo "Copying debug binary to Ubuntu VM..."
-	@scp -P 2222 target/debug/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME)
-	@ssh -p 2222 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)"
-	@echo "✓ Copied to Ubuntu VM (~/.local/bin/$(BINARY_NAME))"
+# Copy release binary to all test VMs (continues even if some VMs are offline)
+# Copies from target/release/insight-reader
+copy-to-vms:
+	@if [ ! -f "target/release/$(BINARY_NAME)" ]; then \
+		echo "Release binary not found. Building..."; \
+		$(MAKE) build; \
+	fi
+	@echo "Copying release binary from target/release/$(BINARY_NAME) to all test VMs..."
+	@echo ""
+	@echo "Copying to Ubuntu Desktop Minimal (port 2222)..."
+	@-scp -P 2222 target/release/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
+		ssh -p 2222 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
+		echo "✓ Copied to Ubuntu VM" || echo "✗ Ubuntu VM offline or unreachable"
+	@echo ""
+	@echo "Copying to Manjaro KDE (port 2223)..."
+	@-scp -P 2223 target/release/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
+		ssh -p 2223 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
+		echo "✓ Copied to Manjaro VM" || echo "✗ Manjaro VM offline or unreachable"
+	@echo ""
+	@echo "Copying to Fedora 43 Workstation (port 2224)..."
+	@-scp -P 2224 target/release/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
+		ssh -p 2224 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
+		echo "✓ Copied to Fedora VM" || echo "✗ Fedora VM offline or unreachable"
+	@echo ""
+	@echo "Copying to PopOs Cosmic (port 2225)..."
+	@-scp -P 2225 target/release/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
+		ssh -p 2225 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
+		echo "✓ Copied to PopOs VM" || echo "✗ PopOs VM offline or unreachable"
+	@echo ""
+	@echo "✓ Copy process completed (some VMs may be offline)"
 
 # Show help
 help:
-	@echo "insight-reader Makefile - Build release artifacts with version and platform info"
+	@echo "insight-reader Makefile"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make build       - Build release binary and create versioned artifact"
-	@echo "  make clean       - Remove all build artifacts (build/ and target/)"
+	@echo "  make build       - Build release binary to target/release/"
+	@echo "  make clean       - Remove all build artifacts (cargo clean)"
 	@echo "  make install     - Build and install binary to ~/.local/bin/insight-reader"
-	@echo "  make copy-ubuntu - Build debug binary and copy to Ubuntu VM (port 2222)"
+	@echo "  make copy-to-vms - Build release binary and copy to all test VMs"
 	@echo "  make help        - Show this help message"
 	@echo ""
 	@echo "Build Output:"
-	@echo "  Artifact: $(ARTIFACT_NAME)"
-	@echo "  Symlink:  $(BINARY_NAME) -> $(ARTIFACT_NAME)"
-	@echo "  Location: $(BUILD_DIR)/"
-	@echo ""
-	@echo "Detected Platform:"
-	@echo "  OS:   $(OS)"
-	@echo "  Arch: $(ARCH)"
+	@echo "  Binary: $(BINARY_PATH)"
 	@echo ""
 	@echo "Cross-compilation (optional):"
 	@echo "  Set TARGET environment variable to build for different platforms:"
@@ -176,10 +90,7 @@ help:
 	@echo "    TARGET=x86_64-apple-darwin make build         # macOS x86_64"
 	@echo "    TARGET=aarch64-apple-darwin make build        # macOS ARM64 (Apple Silicon)"
 	@echo ""
-	@echo "  Note: 'unknown' in target triple is Rust's required format for generic Linux"
-	@echo ""
 	@echo "Cross-compilation Requirements:"
 	@echo "  1. Install target: rustup target add <target>"
 	@echo "  2. Cross-compilation toolchain (gcc, linker, etc. for target platform)"
-	@echo "  3. Note: Some native dependencies may require additional setup"
 
