@@ -26,7 +26,7 @@ pub fn new() -> (App, Task<Message>) {
         level: window::Level::AlwaysOnTop,
         position: window::Position::SpecificWith(|window_size, monitor_size| {
             // Position at bottom-left corner with small margin
-            let margin = 20.0;
+            let margin = 70.0;
             Point::new(
                 margin,
                 monitor_size.height - window_size.height - margin,

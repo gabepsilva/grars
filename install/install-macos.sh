@@ -283,8 +283,9 @@ create_app_bundle() {
         return 1
     fi
     
-    log_info "Creating symlink to binary in app bundle..."
-    ln -s "$INSIGHT_READER_BIN" "$APP_MACOS/insight-reader"
+    log_info "Copying binary to app bundle (instead of symlink for proper permissions)..."
+    cp "$INSIGHT_READER_BIN" "$APP_MACOS/insight-reader"
+    chmod +x "$APP_MACOS/insight-reader"
     
     # Convert PNG logo to ICNS for macOS icon
     if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
@@ -374,6 +375,23 @@ create_app_bundle() {
         rm -f "$temp_logo" 2>/dev/null || true
     fi
     
+    # Copy Swift OCR script to app bundle Resources
+    log_info "Copying OCR script to app bundle Resources..."
+    local script_source="$INSTALL_DIR/bin/extract_text_from_image.swift"
+    if [ -f "$script_source" ]; then
+        cp "$script_source" "$APP_RESOURCES/extract_text_from_image.swift"
+        chmod +x "$APP_RESOURCES/extract_text_from_image.swift"
+        log_success "OCR script copied to app bundle Resources"
+    elif [ -f "install/extract_text_from_image.swift" ]; then
+        # Fallback: copy from local directory if available
+        cp "install/extract_text_from_image.swift" "$APP_RESOURCES/extract_text_from_image.swift"
+        chmod +x "$APP_RESOURCES/extract_text_from_image.swift"
+        log_success "OCR script copied to app bundle Resources (from local directory)"
+    else
+        log_warn "OCR script not found at $script_source or install/extract_text_from_image.swift"
+        log_warn "OCR functionality may not work in app bundle"
+    fi
+    
     # Create Info.plist
     log_info "Creating Info.plist..."
     cat > "$APP_CONTENTS/Info.plist" <<EOF
@@ -407,6 +425,10 @@ create_app_bundle() {
     <true/>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Insight Reader needs screen recording permission to capture screenshots for text extraction using OCR.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Insight Reader does not use the microphone. This permission may be requested by the audio playback framework but is not required for text-to-speech functionality.</string>
 </dict>
 </plist>
 EOF

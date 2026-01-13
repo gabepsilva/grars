@@ -15,31 +15,65 @@ pub(super) fn extract_text_from_image_macos(image_path: &str) -> Result<String, 
         return Err(format!("Image file does not exist: {}", image_path));
     }
     
-    // Find the Swift script path: try executable directory, parent, then current directory
+    // Find the Swift script path: try multiple locations
     let script_path = env::current_exe()
         .ok()
         .and_then(|exe_path| {
-            exe_path.parent()
-                .map(|dir| dir.join("extract_text_from_image.swift"))
+            // Try app bundle Resources directory (if running from app bundle)
+            exe_path
+                .parent()
+                .and_then(|macos_dir| {
+                    macos_dir.parent().map(|contents| {
+                        contents.join("Resources").join("extract_text_from_image.swift")
+                    })
+                })
                 .filter(|p| p.exists())
         })
         .or_else(|| {
+            // Try standard installation directory
+            env::var("HOME")
+                .ok()
+                .map(|home| {
+                    Path::new(&home)
+                        .join(".local")
+                        .join("share")
+                        .join("insight-reader")
+                        .join("bin")
+                        .join("extract_text_from_image.swift")
+                })
+                .filter(|p| p.exists())
+        })
+        .or_else(|| {
+            // Try executable directory
             env::current_exe()
                 .ok()
                 .and_then(|exe_path| {
-                    exe_path.parent()
+                    exe_path
+                        .parent()
+                        .map(|dir| dir.join("extract_text_from_image.swift"))
+                        .filter(|p| p.exists())
+                })
+        })
+        .or_else(|| {
+            // Try parent of executable directory
+            env::current_exe()
+                .ok()
+                .and_then(|exe_path| {
+                    exe_path
+                        .parent()
                         .and_then(|dir| dir.parent())
                         .map(|dir| dir.join("extract_text_from_image.swift"))
                         .filter(|p| p.exists())
                 })
         })
         .or_else(|| {
+            // Try relative path from current directory (for development)
             Path::new("install/extract_text_from_image.swift")
                 .exists()
                 .then(|| Path::new("install/extract_text_from_image.swift").to_path_buf())
         })
         .ok_or_else(|| {
-            error!("extract_text_from_image.swift script not found");
+            error!("extract_text_from_image.swift script not found in any expected location");
             "extract_text_from_image.swift script not found".to_string()
         })?;
     
