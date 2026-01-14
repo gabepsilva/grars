@@ -7,6 +7,9 @@ use tray_icon::{
 };
 use tracing::info;
 
+// Embedded logo asset
+const LOGO_PNG: &[u8] = include_bytes!("../../../assets/logo.png");
+
 /// System tray handle
 pub struct SystemTray {
     _tray_icon: TrayIcon,
@@ -46,10 +49,10 @@ impl SystemTray {
         menu.append(&read_selected_item)?;
         menu.append(&quit_item)?;
         
-        // Create a simple icon from bytes (16x16 black square with transparency)
-        // This is a minimal template icon for macOS menu bar
-        let icon_data = create_tray_icon();
-        let icon = tray_icon::Icon::from_rgba(icon_data, 16, 16)
+        // Load and resize the app logo for the tray icon
+        // macOS menu bar icons are typically 16x16 or 22x22 (retina)
+        let icon_data = load_tray_icon_from_logo()?;
+        let icon = tray_icon::Icon::from_rgba(icon_data.0, icon_data.1, icon_data.2)
             .map_err(|e| format!("Failed to create icon: {e}"))?;
         
         // Set up menu event handler before creating the tray icon
@@ -94,26 +97,28 @@ impl SystemTray {
     }
 }
 
-/// Create a simple 16x16 RGBA icon for the tray (black circle)
-fn create_tray_icon() -> Vec<u8> {
-    let mut data = vec![0u8; 16 * 16 * 4];
-    let center_x = 8.0;
-    let center_y = 8.0;
+/// Load the app logo and convert it to RGBA format for the tray icon
+/// Returns (rgba_data, width, height)
+fn load_tray_icon_from_logo() -> Result<(Vec<u8>, u32, u32), Box<dyn std::error::Error>> {
+    // Decode the PNG logo
+    let img = image::load_from_memory(LOGO_PNG)
+        .map_err(|e| format!("Failed to decode logo PNG: {e}"))?;
     
-    for y in 0..16 {
-        for x in 0..16 {
-            let idx = (y * 16 + x) * 4;
-            let dist = ((x as f32 - center_x).powi(2) + (y as f32 - center_y).powi(2)).sqrt();
-            
-            data[idx + 3] = if dist < 6.0 {
-                255 // Opaque fill
-            } else if dist < 7.0 {
-                200 // Border
-            } else {
-                0 // Transparent
-            };
-        }
-    }
+    // Convert to RGBA format
+    let rgba_img = img.to_rgba8();
     
-    data
+    // Resize to 16x16 for standard display, or 22x22 for retina
+    // Using 22x22 for better quality on retina displays
+    let target_size = 22u32;
+    let resized = image::imageops::resize(
+        &rgba_img,
+        target_size,
+        target_size,
+        image::imageops::FilterType::Lanczos3,
+    );
+    
+    // Convert to Vec<u8> in RGBA format
+    let rgba_data = resized.into_raw();
+    
+    Ok((rgba_data, target_size, target_size))
 }
