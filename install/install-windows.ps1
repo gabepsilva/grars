@@ -352,70 +352,15 @@ function Install-Piper {
         return $false
     }
     
-    # Install EasyOCR for OCR functionality
-    Write-ColorOutput "Installing EasyOCR for OCR functionality (CPU-only)..." "INFO"
-    
-    # Check if EasyOCR is already installed
-    $easyocrInstalled = $false
-    try {
-        $null = & $pythonExe -c "import easyocr" 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            $easyocrInstalled = $true
-        }
-    } catch {
-        # Not installed
-    }
-    
-    if ($easyocrInstalled) {
-        Write-ColorOutput "EasyOCR is already installed" "SUCCESS"
-    } else {
-        # Install CPU-only PyTorch first
-        Write-ColorOutput "Installing CPU-only PyTorch (required for EasyOCR)..." "INFO"
-        & $pythonExe -m pip install --quiet torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu 2>$null
-        
-        # Install EasyOCR
-        Write-ColorOutput "Installing EasyOCR (this may take a while)..." "INFO"
-        & $pythonExe -m pip install --quiet easyocr 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Write-ColorOutput "EasyOCR installation may have failed. OCR functionality may not work." "WARN"
-        } else {
-            Write-ColorOutput "EasyOCR installed successfully" "SUCCESS"
-        }
-    }
+    # Note: Windows uses built-in Windows.Media.Ocr API for OCR functionality
+    # No external dependencies (Python, EasyOCR, PyTorch) are required for OCR on Windows
+    # The OCR engine automatically uses the user's profile languages
     
     return $true
 }
 
-function Install-OcrScript {
-    Write-ColorOutput "Installing OCR script..."
-    
-    $scriptDir = Join-Path $InstallDir "bin"
-    $scriptFile = Join-Path $scriptDir "extract_text_from_image.py"
-    
-    New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
-    
-    # Try to copy from local directory first
-    if (Test-Path "install\extract_text_from_image.py") {
-        Write-ColorOutput "Copying extract_text_from_image.py from local directory" "INFO"
-        Copy-Item "install\extract_text_from_image.py" $scriptFile -Force
-        Write-ColorOutput "OCR script installed to $scriptFile" "SUCCESS"
-        return $true
-    }
-    
-    # Download from GitHub
-    Write-ColorOutput "Downloading OCR script from GitHub..." "INFO"
-    $scriptUrl = "https://raw.githubusercontent.com/$GithubRepo/master/install/extract_text_from_image.py"
-    
-    try {
-        Invoke-WebRequest -Uri $scriptUrl -OutFile $scriptFile
-        Write-ColorOutput "OCR script downloaded and installed to $scriptFile" "SUCCESS"
-        return $true
-    } catch {
-        Write-ColorOutput "Failed to download OCR script: $_" "WARN"
-        Write-ColorOutput "OCR functionality may not work" "WARN"
-        return $false
-    }
-}
+# Install-OcrScript function removed - Windows uses built-in Windows.Media.Ocr API
+# No Python script installation needed for Windows OCR functionality
 
 function Install-Model {
     Write-ColorOutput "Checking for default voice model: $DefaultModelName..."
@@ -526,9 +471,9 @@ function Main {
         }
     }
     
-    # Install OCR script
+    # OCR functionality uses built-in Windows.Media.Ocr API - no installation needed
     Write-Host ""
-    Install-OcrScript | Out-Null
+    Write-ColorOutput "OCR functionality uses Windows built-in OCR (no installation required)" "INFO"
     
     # Download model
     Write-Host ""

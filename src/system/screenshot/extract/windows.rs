@@ -21,12 +21,10 @@ pub(super) fn extract_text_from_image_windows(image_path: &str) -> Result<String
             None,
             windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
         );
-        if hr.is_err() {
-            // If already initialized, that's okay (S_FALSE = 0x00000001)
-            if hr.0 != 0x00000001 {
-                error!(hr = hr.0, "Failed to initialize Windows Runtime");
-                return Err(format!("Failed to initialize Windows Runtime: HRESULT 0x{:08X}", hr.0));
-            }
+        // If already initialized (S_FALSE = 0x00000001), that's okay
+        if hr.is_err() && hr.0 != 0x00000001 {
+            error!(hr = hr.0, "Failed to initialize Windows Runtime");
+            return Err(format!("Failed to initialize Windows Runtime: HRESULT 0x{:08X}", hr.0));
         }
     }
     
@@ -42,53 +40,61 @@ pub(super) fn extract_text_from_image_windows(image_path: &str) -> Result<String
 }
 
 fn extract_text_with_windows_ocr(image_path: &str) -> Result<String, String> {
+    use std::fs;
     use windows::{
         core::*,
         Graphics::Imaging::*,
         Media::Ocr::*,
-        Storage::*,
         Storage::Streams::*,
     };
     
-    // Convert image path to absolute Windows path
-    let file_path = Path::new(image_path)
-        .canonicalize()
-        .map_err(|e| {
-            error!(error = %e, "Failed to canonicalize image path");
-            format!("Failed to canonicalize image path: {}", e)
-        })?;
+    // Read the image file into memory
+    let image_bytes = fs::read(image_path).map_err(|e| {
+        error!(error = %e, "Failed to read image file");
+        format!("Failed to read image file: {}", e)
+    })?;
     
-    // Convert to Windows path string (backslashes)
-    let file_path_str = file_path.to_string_lossy().replace('/', "\\");
-    let file_path_hstring: HSTRING = file_path_str.into();
+    debug!(bytes = image_bytes.len(), "Read image file into memory");
     
-    // Get the file using the absolute path
-    let file = StorageFile::GetFileFromPathAsync(&file_path_hstring)
-        .map_err(|e| {
-            error!(error = %e, "Failed to get file from path");
-            format!("Failed to open image file: {}", e)
-        })?
-        .get()
-        .map_err(|e| {
-            error!(error = %e, "Failed to get StorageFile result");
-            format!("Failed to open image file: {}", e)
-        })?;
+    // Create an in-memory random access stream from the bytes
+    let stream = InMemoryRandomAccessStream::new().map_err(|e| {
+        error!(error = %e, "Failed to create in-memory stream");
+        format!("Failed to create stream: {}", e)
+    })?;
     
-    // Open the file stream
-    let file_stream = file
-        .OpenAsync(FileAccessMode::Read)
-        .map_err(|e| {
-            error!(error = %e, "Failed to open file stream");
-            format!("Failed to open image file: {}", e)
-        })?
-        .get()
-        .map_err(|e| {
-            error!(error = %e, "Failed to get file stream result");
-            format!("Failed to open image file: {}", e)
-        })?;
+    // Create a DataWriter associated with the stream
+    let data_writer = DataWriter::CreateDataWriter(&stream).map_err(|e| {
+        error!(error = %e, "Failed to create data writer");
+        format!("Failed to create stream: {}", e)
+    })?;
+    
+    // Write the image bytes to the stream
+    data_writer.WriteBytes(&image_bytes).map_err(|e| {
+        error!(error = %e, "Failed to write bytes to stream");
+        format!("Failed to write image data: {}", e)
+    })?;
+    
+    // Store the bytes (this commits the write)
+    data_writer.StoreAsync().map_err(|e| {
+        error!(error = %e, "Failed to store bytes");
+        format!("Failed to write image data: {}", e)
+    })?
+    .get()
+    .map_err(|e| {
+        error!(error = %e, "Failed to get store result");
+        format!("Failed to write image data: {}", e)
+    })?;
+    
+    debug!("Wrote image bytes to stream");
+    
+    // Reset stream position to beginning for reading
+    stream.Seek(0).map_err(|e| {
+        error!(error = %e, "Failed to seek stream");
+        format!("Failed to process image: {}", e)
+    })?;
     
     // Create random access stream reference
-    let random_access_stream: IRandomAccessStream = file_stream.cast().map_err(|e| {
+    let random_access_stream: IRandomAccessStream = stream.cast().map_err(|e| {
         error!(error = %e, "Failed to cast to IRandomAccessStream");
         format!("Failed to process image: {}", e)
     })?;
