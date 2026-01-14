@@ -117,7 +117,7 @@ pub(super) fn capture_region_linux() -> Result<String, String> {
         // grim+slurp handled separately
         Tool { name: "scrot", args: &["-s"] },
         Tool { name: "gnome-screenshot", args: &["-a", "--file"] },
-        Tool { name: "spectacle", args: &["-r", "-b", "-o"] },
+        Tool { name: "spectacle", args: &["-r", "-b", "-n", "-o"] },
     ];
     
     // Try flameshot and maim first

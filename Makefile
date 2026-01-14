@@ -48,23 +48,23 @@ copy-to-vms:
 	@echo "Copying release binary from target/release/$(BINARY_NAME) to all test VMs..."
 	@echo ""
 	@echo "Copying to Ubuntu Desktop Minimal (port 2222)..."
-	@-scp -P 2222 target/release/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
-		ssh -p 2222 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
+	@-scp -P 2222 target/release/$(BINARY_NAME) virtuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
+		ssh -p 2222 virtuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
 		echo "✓ Copied to Ubuntu VM" || echo "✗ Ubuntu VM offline or unreachable"
 	@echo ""
 	@echo "Copying to Manjaro KDE (port 2223)..."
-	@-scp -P 2223 target/release/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
-		ssh -p 2223 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
+	@-scp -P 2223 target/release/$(BINARY_NAME) virtuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
+		ssh -p 2223 virtuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
 		echo "✓ Copied to Manjaro VM" || echo "✗ Manjaro VM offline or unreachable"
 	@echo ""
 	@echo "Copying to Fedora 43 Workstation (port 2224)..."
-	@-scp -P 2224 target/release/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
-		ssh -p 2224 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
+	@-scp -P 2224 target/release/$(BINARY_NAME) virtuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
+		ssh -p 2224 virtuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
 		echo "✓ Copied to Fedora VM" || echo "✗ Fedora VM offline or unreachable"
 	@echo ""
 	@echo "Copying to PopOs Cosmic (port 2225)..."
-	@-scp -P 2225 target/release/$(BINARY_NAME) vboxuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
-		ssh -p 2225 vboxuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
+	@-scp -P 2225 target/release/$(BINARY_NAME) virtuser@localhost:/tmp/$(BINARY_NAME) 2>/dev/null && \
+		ssh -p 2225 virtuser@localhost "cp /tmp/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME) && chmod +x ~/.local/bin/$(BINARY_NAME)" 2>/dev/null && \
 		echo "✓ Copied to PopOs VM" || echo "✗ PopOs VM offline or unreachable"
 	@echo ""
 	@echo "✓ Copy process completed (some VMs may be offline)"

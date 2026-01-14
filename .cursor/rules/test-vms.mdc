@@ -8,16 +8,16 @@ alwaysApply: false
 
 
 ## Ubuntu Desktop Minimal
-ssh vboxuser@localhost -p 2222
+ssh virtuser@localhost -p 2222
 
 ## Manjaro KDE
-ssh vboxuser@localhost -p 2223
+ssh virtuser@localhost -p 2223
 
 ## Fedora 43 Workstation
-ssh vboxuser@localhost -p 2224
+ssh virtuser@localhost -p 2224
 
 ## PopOs Cosmic
-ssh vboxuser@localhost -p 2225
+ssh virtuser@localhost -p 2225
 
 ## Copy Debug Binary to VM
 
@@ -29,7 +29,7 @@ When user says "copy to vm X" or similar, copy the debug binary to the specified
 
 **Process:**
 1. Build debug binary: `cargo build` (if not already built)
-2. SCP to VM: `scp -P <PORT> target/debug/insight-reader vboxuser@localhost:/tmp/insight-reader`
-3. SSH and replace: `ssh -p <PORT> vboxuser@localhost "cp /tmp/insight-reader ~/.local/bin/insight-reader && chmod +x ~/.local/bin/insight-reader"`
+2. SCP to VM: `scp -P <PORT> target/debug/insight-reader virtuser@localhost:/tmp/insight-reader`
+3. SSH and replace: `ssh -p <PORT> virtuser@localhost "cp /tmp/insight-reader ~/.local/bin/insight-reader && chmod +x ~/.local/bin/insight-reader"`
 
 
