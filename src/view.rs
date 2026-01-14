@@ -210,6 +210,28 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
     ]
     .spacing(0);
 
+    // AWS Polly error message display (if present and AWS Polly is selected)
+    let polly_error_display: Element<'a, Message> = if app.selected_backend == TTSBackend::AwsPolly {
+        if let Some(error_msg) = &app.polly_error_message {
+            container(
+                container(
+                    error_text(error_msg, 13)
+                        .width(Length::Fill)
+                )
+                .width(Length::Fill)
+                .padding(12)
+                .style(error_container_style)
+            )
+            .padding([12, 16]) // Add padding around the error box
+            .width(Length::Fill)
+            .into()
+        } else {
+            column![].spacing(0).into()
+        }
+    } else {
+        column![].spacing(0).into()
+    };
+
     // Piper Voice section (only shown when Piper is selected)
     let piper_voice_section: Element<'a, Message> = if app.selected_backend == TTSBackend::Piper {
         use crate::voices;
@@ -490,6 +512,7 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
             .width(Length::Fill)
             .padding([12.0, 16.0]),
             error_display,
+            polly_error_display,
             piper_voice_section,
             polly_voice_section,
         ]

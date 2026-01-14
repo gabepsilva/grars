@@ -353,6 +353,7 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 match PollyTTSProvider::check_credentials() {
                     Ok(()) => {
                         app.error_message = None;
+                        app.polly_error_message = None; // Clear Polly error when credentials are valid
                         info!("AWS credentials found");
                         // Fetch AWS voices if not already loaded
                         if app.polly_voices.is_none() {
@@ -369,11 +370,13 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                         warn!("AWS credentials not found when selecting AWS Polly");
                         // Clear voices if credentials are not available
                         app.polly_voices = None;
+                        app.polly_error_message = None; // Don't show service error if credentials are missing
                     }
                 }
             } else {
                 // Clear error message when switching to Piper
                 app.error_message = None;
+                app.polly_error_message = None;
             }
             
             // Persist the selected backend so future runs remember the choice.
@@ -567,11 +570,26 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 Ok(voices) => {
                     info!(count = voices.len(), "AWS Polly voices loaded successfully");
                     app.polly_voices = Some(voices);
+                    app.polly_error_message = None; // Clear error on success
                 }
                 Err(e) => {
                     debug!(error = %e, "Failed to load AWS Polly voices (credentials may not be configured)");
-                    // Don't show error for missing credentials - this is expected if user hasn't configured AWS
                     app.polly_voices = None;
+                    // Show error for service errors (e.g., clock skew, network issues) but not credential errors
+                    let error_lower = e.to_lowercase();
+                    let is_credential_error = error_lower.contains("credentials")
+                        || error_lower.contains("authentication")
+                        || error_lower.contains("unauthorized");
+                    let is_service_error = error_lower.contains("service error")
+                        || error_lower.contains("network")
+                        || error_lower.contains("timeout")
+                        || error_lower.contains("clock");
+                    
+                    app.polly_error_message = if is_service_error || !is_credential_error {
+                        Some(e)
+                    } else {
+                        None
+                    };
                 }
             }
             Task::none()
