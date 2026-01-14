@@ -51,14 +51,58 @@ def main() -> int:
         # Read text from image
         results = reader.readtext(image_path)
         
-        # Extract text from results
+        # Group text by Y-coordinate to preserve line breaks
         # results is a list of tuples: (bbox, text, confidence)
-        extracted_text_parts = []
-        for (bbox, text, confidence) in results:
-            extracted_text_parts.append(text)
+        # bbox is a list of 4 points: [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]
+        # We'll use the average Y-coordinate to group into lines
+        y_tolerance = 10.0  # Pixels - text within this Y range is considered same line
         
-        # Join all text parts with spaces
-        extracted_text = " ".join(extracted_text_parts)
+        # Sort results by Y-coordinate (top to bottom)
+        def get_y_center(bbox):
+            """Get the center Y-coordinate of a bounding box."""
+            y_coords = [point[1] for point in bbox]
+            return sum(y_coords) / len(y_coords)
+        
+        def get_x_min(bbox):
+            """Get the minimum X-coordinate for sorting within a line."""
+            x_coords = [point[0] for point in bbox]
+            return min(x_coords)
+        
+        sorted_results = sorted(results, key=lambda r: (get_y_center(r[0]), get_x_min(r[0])))
+        
+        # Group into lines
+        line_groups = []
+        current_line = []
+        last_y = None
+        
+        for (bbox, text, confidence) in sorted_results:
+            current_y = get_y_center(bbox)
+            
+            if last_y is not None:
+                # Check if this text is on a new line
+                if abs(current_y - last_y) > y_tolerance:
+                    # New line detected
+                    if current_line:
+                        line_groups.append(current_line)
+                        current_line = []
+            
+            current_line.append((bbox, text, confidence))
+            last_y = current_y
+        
+        # Add the last line
+        if current_line:
+            line_groups.append(current_line)
+        
+        # Extract text from each line group
+        extracted_lines = []
+        for line_group in line_groups:
+            line_text_parts = [text for (_, text, _) in line_group]
+            if line_text_parts:
+                # Join words on the same line with spaces
+                extracted_lines.append(" ".join(line_text_parts))
+        
+        # Join lines with newlines to preserve line breaks
+        extracted_text = "\n".join(extracted_lines)
         
         if not extracted_text.strip():
             # No text found - exit with code 1 but no error message (this is expected)

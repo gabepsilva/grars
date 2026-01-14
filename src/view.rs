@@ -15,14 +15,14 @@ const MIN_HEIGHT: f32 = 4.0;
 const MAX_HEIGHT: f32 = 24.0;
 const NUM_BARS: usize = 10;
 
-/// Convert AWS Polly engine string to display name
+/// Convert AWS Polly engine string to display name.
+///
+/// Only "LongForm" needs transformation to "Long-Form"; all others are returned as-is.
 fn engine_display_name(engine: &str) -> &str {
-    match engine {
-        "Standard" => "Standard",
-        "Neural" => "Neural",
-        "Generative" => "Generative",
-        "LongForm" => "Long-Form",
-        _ => engine,
+    if engine == "LongForm" {
+        "Long-Form"
+    } else {
+        engine
     }
 }
 
@@ -102,6 +102,78 @@ fn white_text(content: &str, size: u32) -> text::Text<'_> {
         .style(|_theme| iced::widget::text::Style {
             color: Some(Color::WHITE),
         })
+}
+
+/// Create a language selection grid from a list of language codes and info.
+///
+/// Returns a scrollable grid with 4 columns showing flag icons and language names.
+/// Each language button opens the voice selection window for that language.
+fn create_language_grid(
+    languages: Vec<(String, crate::model::LanguageInfo)>,
+    selected_language: Option<&str>,
+) -> Element<'static, Message> {
+    const COLS: usize = 4;
+    let mut grid_rows = column![].spacing(6);
+    let mut current_row = row![].spacing(8);
+    let mut col_count = 0;
+    
+    for (lang_code, lang_info) in languages.iter() {
+        let flag_icon = flags::get_flag_icon(lang_code);
+        let label_text = format!("{} ({})", lang_info.name_english, lang_code);
+        let lang_code_clone = lang_code.clone();
+        let is_selected = selected_language == Some(lang_code.as_str());
+        
+        let lang_button = button(
+            container(
+                row![
+                    flag_icon,
+                    Space::new().width(Length::Fixed(6.0)),
+                    text(label_text).size(13)
+                        .style(move |_theme| iced::widget::text::Style {
+                            color: Some(if is_selected {
+                                Color::WHITE
+                            } else {
+                                Color::from_rgba(1.0, 1.0, 1.0, 0.7)
+                            }),
+                        })
+                ]
+                .align_y(Alignment::Center)
+            )
+            .padding([5.0, 8.0])
+            .width(Length::Fill)
+        )
+        .style(transparent_button_style)
+        .width(Length::Fill)
+        .on_press(Message::OpenVoiceSelection(lang_code_clone));
+        
+        current_row = current_row.push(
+            container(lang_button)
+                .width(Length::Fill)
+        );
+        col_count += 1;
+        
+        if col_count >= COLS {
+            grid_rows = grid_rows.push(current_row);
+            current_row = row![].spacing(8);
+            col_count = 0;
+        }
+    }
+    
+    // Fill remaining columns in the last row
+    if col_count > 0 {
+        while col_count < COLS {
+            current_row = current_row.push(
+                container(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
+                    .width(Length::Fill)
+            );
+            col_count += 1;
+        }
+        grid_rows = grid_rows.push(current_row);
+    }
+    
+    scrollable(grid_rows)
+        .height(Length::Fixed(300.0))
+        .into()
 }
 
 /// Helper to create red error text with consistent styling.
@@ -210,6 +282,28 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
     ]
     .spacing(0);
 
+    // AWS Polly error message display (if present and AWS Polly is selected)
+    let polly_error_display: Element<'a, Message> = if app.selected_backend == TTSBackend::AwsPolly {
+        if let Some(error_msg) = &app.polly_error_message {
+            container(
+                container(
+                    error_text(error_msg, 13)
+                        .width(Length::Fill)
+                )
+                .width(Length::Fill)
+                .padding(12)
+                .style(error_container_style)
+            )
+            .padding([12, 16]) // Add padding around the error box
+            .width(Length::Fill)
+            .into()
+        } else {
+            column![].spacing(0).into()
+        }
+    } else {
+        column![].spacing(0).into()
+    };
+
     // Piper Voice section (only shown when Piper is selected)
     let piper_voice_section: Element<'a, Message> = if app.selected_backend == TTSBackend::Piper {
         use crate::voices;
@@ -229,78 +323,10 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
                 })
         };
         
-        // Get available languages from voices - create controls inline to avoid lifetime issues
+        // Get available languages from voices
         let language_controls: Element<'a, Message> = if let Some(ref voices) = app.voices {
             let languages = voices::get_available_languages(voices);
-            
-            // Create grid layout: 4 columns
-            const COLS: usize = 4;
-            let mut grid_rows = column![].spacing(6);
-            let mut current_row = row![].spacing(8);
-            let mut col_count = 0;
-            
-            // Show all languages in a grid
-            for (lang_code, lang_info) in languages.iter() {
-                let flag_icon = flags::get_flag_icon(lang_code);
-                let label_text = format!("{} ({})", lang_info.name_english, lang_code);
-                let lang_code_clone = lang_code.clone();
-                let is_selected = app.selected_language.as_deref() == Some(lang_code);
-                
-                // Create button with SVG flag + text label
-                let lang_button = button(
-                    container(
-                        row![
-                            flag_icon,
-                            Space::new().width(Length::Fixed(6.0)),
-                            text(label_text).size(13)
-                                .style(move |_theme| iced::widget::text::Style {
-                                    color: Some(if is_selected {
-                                        Color::WHITE
-                                    } else {
-                                        Color::from_rgba(1.0, 1.0, 1.0, 0.7)
-                                    }),
-                                })
-                        ]
-                        .align_y(Alignment::Center)
-                    )
-                    .padding([5.0, 8.0])
-                    .width(Length::Fill)
-                )
-                .style(transparent_button_style)
-                .width(Length::Fill)
-                .on_press(Message::OpenVoiceSelection(lang_code_clone));
-                
-                current_row = current_row.push(
-                    container(lang_button)
-                        .width(Length::Fill)
-                );
-                col_count += 1;
-                
-                // Start new row when we reach column limit
-                if col_count >= COLS {
-                    grid_rows = grid_rows.push(current_row);
-                    current_row = row![].spacing(8);
-                    col_count = 0;
-                }
-            }
-            
-            // Add remaining items in the last row
-            if col_count > 0 {
-                // Fill remaining columns with empty space
-                while col_count < COLS {
-                    current_row = current_row.push(
-                        container(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
-                            .width(Length::Fill)
-                    );
-                    col_count += 1;
-                }
-                grid_rows = grid_rows.push(current_row);
-            }
-            
-            // Make language grid scrollable (without Select Voice button)
-            scrollable(grid_rows)
-                .height(Length::Fixed(300.0))
-                .into()
+            create_language_grid(languages, app.selected_language.as_deref()).into()
         } else {
             // Voices not loaded yet
             column![
@@ -371,76 +397,9 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
                     })
             };
             
-            // Get available languages from AWS voices - create controls inline to avoid lifetime issues
+            // Get available languages from AWS voices
             let languages = aws::get_available_languages(voices);
-            
-            // Create grid layout: 4 columns
-            const COLS: usize = 4;
-            let mut grid_rows = column![].spacing(6);
-            let mut current_row = row![].spacing(8);
-            let mut col_count = 0;
-            
-            // Show all languages in a grid
-            for (lang_code, lang_info) in languages.iter() {
-                let flag_icon = flags::get_flag_icon(lang_code);
-                let label_text = format!("{} ({})", lang_info.name_english, lang_code);
-                let lang_code_clone = lang_code.clone();
-                let is_selected = app.selected_language.as_deref() == Some(lang_code);
-                
-                // Create button with SVG flag + text label
-                let lang_button = button(
-                    container(
-                        row![
-                            flag_icon,
-                            Space::new().width(Length::Fixed(6.0)),
-                            text(label_text).size(13)
-                                .style(move |_theme| iced::widget::text::Style {
-                                    color: Some(if is_selected {
-                                        Color::WHITE
-                                    } else {
-                                        Color::from_rgba(1.0, 1.0, 1.0, 0.7)
-                                    }),
-                                })
-                        ]
-                        .align_y(Alignment::Center)
-                    )
-                    .padding([5.0, 8.0])
-                    .width(Length::Fill)
-                )
-                .style(transparent_button_style)
-                .width(Length::Fill)
-                .on_press(Message::OpenVoiceSelection(lang_code_clone));
-                
-                current_row = current_row.push(
-                    container(lang_button)
-                        .width(Length::Fill)
-                );
-                col_count += 1;
-                
-                // Start new row when we reach column limit
-                if col_count >= COLS {
-                    grid_rows = grid_rows.push(current_row);
-                    current_row = row![].spacing(8);
-                    col_count = 0;
-                }
-            }
-            
-            // Add remaining items in the last row
-            if col_count > 0 {
-                // Fill remaining columns with empty space
-                while col_count < COLS {
-                    current_row = current_row.push(
-                        container(Space::new().width(Length::Fill).height(Length::Fixed(1.0)))
-                            .width(Length::Fill)
-                    );
-                    col_count += 1;
-                }
-                grid_rows = grid_rows.push(current_row);
-            }
-            
-            let language_controls: Element<'a, Message> = scrollable(grid_rows)
-                .height(Length::Fixed(300.0))
-                .into();
+            let language_controls: Element<'a, Message> = create_language_grid(languages, app.selected_language.as_deref()).into();
             
             container(
                 container(
@@ -490,6 +449,7 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
             .width(Length::Fill)
             .padding([12.0, 16.0]),
             error_display,
+            polly_error_display,
             piper_voice_section,
             polly_voice_section,
         ]
@@ -595,7 +555,7 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
         }
         #[cfg(target_os = "windows")]
         {
-            "Standard OCR (EasyOCR, local)"
+            "Standard OCR (Windows Ocr2, local)"
         }
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         {

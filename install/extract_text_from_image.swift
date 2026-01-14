@@ -69,16 +69,66 @@ guard let observations = textRequest.results, !observations.isEmpty else {
     exit(1)
 }
 
-var extractedTextParts: [String] = []
-for observation in observations {
-    let topCandidates = observation.topCandidates(1)
-    guard let topCandidate = topCandidates.first else {
-        continue
+// Group observations by Y-coordinate to preserve line breaks
+// Observations with similar Y-coordinates are on the same line
+var lineGroups: [[VNRecognizedTextObservation]] = []
+var currentLine: [VNRecognizedTextObservation] = []
+var lastY: CGFloat? = nil
+let yTolerance: CGFloat = 10.0 // Pixels - text within this Y range is considered same line
+
+// Sort observations by Y-coordinate (top to bottom)
+let sortedObservations = observations.sorted { obs1, obs2 in
+    let y1 = obs1.boundingBox.midY
+    let y2 = obs2.boundingBox.midY
+    if abs(y1 - y2) < yTolerance {
+        // Same line, sort by X (left to right)
+        return obs1.boundingBox.minX < obs2.boundingBox.minX
     }
-    extractedTextParts.append(topCandidate.string)
+    return y1 < y2
 }
 
-let extractedText = extractedTextParts.joined(separator: " ")
+for observation in sortedObservations {
+    let currentY = observation.boundingBox.midY
+    
+    if let lastYValue = lastY {
+        // Check if this observation is on a new line
+        if abs(currentY - lastYValue) > yTolerance {
+            // New line detected
+            if !currentLine.isEmpty {
+                lineGroups.append(currentLine)
+                currentLine = []
+            }
+        }
+    }
+    
+    currentLine.append(observation)
+    lastY = currentY
+}
+
+// Add the last line
+if !currentLine.isEmpty {
+    lineGroups.append(currentLine)
+}
+
+// Extract text from each line group
+var extractedLines: [String] = []
+for lineGroup in lineGroups {
+    var lineTextParts: [String] = []
+    for observation in lineGroup {
+        let topCandidates = observation.topCandidates(1)
+        guard let topCandidate = topCandidates.first else {
+            continue
+        }
+        lineTextParts.append(topCandidate.string)
+    }
+    if !lineTextParts.isEmpty {
+        // Join words on the same line with spaces
+        extractedLines.append(lineTextParts.joined(separator: " "))
+    }
+}
+
+// Join lines with newlines to preserve line breaks
+let extractedText = extractedLines.joined(separator: "\n")
 if extractedText.isEmpty {
     exit(1)
 }

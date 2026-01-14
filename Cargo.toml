@@ -28,3 +28,14 @@ image = "0.25"         # Image decoding for tray icon
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.9" # Core Foundation types for macOS Accessibility API
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Media_Ocr",
+    "Foundation",
+    "Foundation_Collections",
+    "Graphics_Imaging",
+    "Storage",
+    "Storage_Streams",
+    "Win32_System_Com",
+] }

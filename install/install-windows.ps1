@@ -7,6 +7,7 @@ param(
     [string]$ReleaseTag = "",
     [switch]$SkipPython,
     [switch]$SkipPiper,
+    [switch]$SkipShortcuts,
     [switch]$Force,
     [switch]$Yes  # Auto-accept all prompts (non-interactive mode)
 )
@@ -352,70 +353,15 @@ function Install-Piper {
         return $false
     }
     
-    # Install EasyOCR for OCR functionality
-    Write-ColorOutput "Installing EasyOCR for OCR functionality (CPU-only)..." "INFO"
-    
-    # Check if EasyOCR is already installed
-    $easyocrInstalled = $false
-    try {
-        $null = & $pythonExe -c "import easyocr" 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            $easyocrInstalled = $true
-        }
-    } catch {
-        # Not installed
-    }
-    
-    if ($easyocrInstalled) {
-        Write-ColorOutput "EasyOCR is already installed" "SUCCESS"
-    } else {
-        # Install CPU-only PyTorch first
-        Write-ColorOutput "Installing CPU-only PyTorch (required for EasyOCR)..." "INFO"
-        & $pythonExe -m pip install --quiet torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu 2>$null
-        
-        # Install EasyOCR
-        Write-ColorOutput "Installing EasyOCR (this may take a while)..." "INFO"
-        & $pythonExe -m pip install --quiet easyocr 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Write-ColorOutput "EasyOCR installation may have failed. OCR functionality may not work." "WARN"
-        } else {
-            Write-ColorOutput "EasyOCR installed successfully" "SUCCESS"
-        }
-    }
+    # Note: Windows uses built-in Windows.Media.Ocr API for OCR functionality
+    # No external dependencies (Python, EasyOCR, PyTorch) are required for OCR on Windows
+    # The OCR engine automatically uses the user's profile languages
     
     return $true
 }
 
-function Install-OcrScript {
-    Write-ColorOutput "Installing OCR script..."
-    
-    $scriptDir = Join-Path $InstallDir "bin"
-    $scriptFile = Join-Path $scriptDir "extract_text_from_image.py"
-    
-    New-Item -ItemType Directory -Path $scriptDir -Force | Out-Null
-    
-    # Try to copy from local directory first
-    if (Test-Path "install\extract_text_from_image.py") {
-        Write-ColorOutput "Copying extract_text_from_image.py from local directory" "INFO"
-        Copy-Item "install\extract_text_from_image.py" $scriptFile -Force
-        Write-ColorOutput "OCR script installed to $scriptFile" "SUCCESS"
-        return $true
-    }
-    
-    # Download from GitHub
-    Write-ColorOutput "Downloading OCR script from GitHub..." "INFO"
-    $scriptUrl = "https://raw.githubusercontent.com/$GithubRepo/master/install/extract_text_from_image.py"
-    
-    try {
-        Invoke-WebRequest -Uri $scriptUrl -OutFile $scriptFile
-        Write-ColorOutput "OCR script downloaded and installed to $scriptFile" "SUCCESS"
-        return $true
-    } catch {
-        Write-ColorOutput "Failed to download OCR script: $_" "WARN"
-        Write-ColorOutput "OCR functionality may not work" "WARN"
-        return $false
-    }
-}
+# Install-OcrScript function removed - Windows uses built-in Windows.Media.Ocr API
+# No Python script installation needed for Windows OCR functionality
 
 function Install-Model {
     Write-ColorOutput "Checking for default voice model: $DefaultModelName..."
@@ -462,22 +408,135 @@ function Add-ToPath {
     
     if ($userPath -notlike "*$BinDir*") {
         Write-ColorOutput "Adding $BinDir to user PATH..." "INFO"
-        
-        if (-not $Yes) {
-            $response = Read-Host "Add insight-reader to PATH? (Y/n)"
-            if ($response -match "^[Nn]") {
-                Write-ColorOutput "Skipping PATH modification" "INFO"
-                Write-ColorOutput "You can run insight-reader from: $InsightReaderBin" "INFO"
-                return
-            }
-        }
-        
         $newPath = "$userPath;$BinDir"
         [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
         Write-ColorOutput "Added to PATH. Please restart your terminal for changes to take effect." "SUCCESS"
     } else {
         Write-ColorOutput "insight-reader is already in PATH" "SUCCESS"
     }
+}
+
+function Create-Shortcuts {
+    Write-ColorOutput "Creating Start Menu and Desktop shortcuts..." "INFO"
+    
+    # Check if binary exists
+    if (-not (Test-Path $InsightReaderBin)) {
+        Write-ColorOutput "Binary not found, skipping shortcut creation" "WARN"
+        return $false
+    }
+    
+    # Paths for shortcuts
+    $StartMenuDir = Join-Path ([Environment]::GetFolderPath("StartMenu")) "Programs"
+    $DesktopDir = [Environment]::GetFolderPath("Desktop")
+    $StartMenuShortcut = Join-Path $StartMenuDir "Insight Reader.lnk"
+    $DesktopShortcut = Join-Path $DesktopDir "Insight Reader.lnk"
+    
+    # Create Start Menu Programs directory if it doesn't exist
+    if (-not (Test-Path $StartMenuDir)) {
+        New-Item -ItemType Directory -Path $StartMenuDir -Force | Out-Null
+    }
+    
+    # Get ICO logo (check local first, then download from GitHub)
+    $IconPath = "$InsightReaderBin,0"  # Default to executable icon
+    
+    # Check for local ICO file first (for development)
+    # Try multiple methods to get script directory
+    $ScriptDir = $PSScriptRoot
+    if (-not $ScriptDir) {
+        $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    if (-not $ScriptDir) {
+        $ScriptDir = Split-Path -Parent $PSCommandPath
+    }
+    if (-not $ScriptDir) {
+        # Fallback: use current directory
+        $ScriptDir = Get-Location
+    }
+    
+    $ProjectRoot = Split-Path -Parent $ScriptDir
+    $LocalIco = Join-Path $ProjectRoot "assets\logo.ico"
+    $IconIco = Join-Path $InstallDir "insight-reader.ico"
+    
+    # Try to use local ICO file if it exists
+    if (Test-Path $LocalIco) {
+        Write-ColorOutput "Using local logo icon from: $LocalIco" "INFO"
+        try {
+            Copy-Item -Path $LocalIco -Destination $IconIco -Force -ErrorAction Stop
+            $IconPath = $IconIco
+            Write-ColorOutput "Logo icon copied to: $IconIco" "SUCCESS"
+        } catch {
+            Write-ColorOutput "Could not copy local icon, trying download..." "WARN"
+            # Fall through to download attempt
+        }
+    }
+    
+    # If local copy failed or doesn't exist, try downloading from GitHub
+    if ($IconPath -eq "$InsightReaderBin,0") {
+        $IconUrl = "https://raw.githubusercontent.com/$GithubRepo/master/assets/logo.ico"
+        try {
+            Write-ColorOutput "Downloading logo icon from GitHub..." "INFO"
+            Invoke-WebRequest -Uri $IconUrl -OutFile $IconIco -ErrorAction Stop
+            
+            # Verify the ICO file was downloaded and is valid
+            if (Test-Path $IconIco) {
+                $IconPath = $IconIco
+                Write-ColorOutput "Logo icon downloaded to: $IconIco" "SUCCESS"
+            } else {
+                Write-ColorOutput "ICO file not found after download, using executable icon" "WARN"
+                $IconPath = "$InsightReaderBin,0"
+            }
+        } catch {
+            Write-ColorOutput "Could not download logo icon, using executable icon" "WARN"
+            $IconPath = "$InsightReaderBin,0"
+        }
+    }
+    
+    # Create shortcut function
+    function New-Shortcut {
+        param(
+            [string]$TargetPath,
+            [string]$ShortcutPath,
+            [string]$Description,
+            [string]$IconLocation
+        )
+        
+        try {
+            $WshShell = New-Object -ComObject WScript.Shell
+            $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+            $Shortcut.TargetPath = $TargetPath
+            $Shortcut.WorkingDirectory = $BinDir
+            $Shortcut.Description = $Description
+            
+            # Set icon location (use absolute path for ICO files)
+            if ($IconLocation -like "*.ico") {
+                # For ICO files, use the full path
+                $IconLocation = (Resolve-Path $IconLocation -ErrorAction SilentlyContinue).Path
+                if (-not $IconLocation) {
+                    $IconLocation = (Get-Item $IconLocation -ErrorAction SilentlyContinue).FullName
+                }
+            }
+            $Shortcut.IconLocation = $IconLocation
+            
+            $Shortcut.Save()
+            Write-ColorOutput "Shortcut created with icon: $IconLocation" "INFO"
+            return $true
+        } catch {
+            Write-ColorOutput "Failed to create shortcut: $_" "ERROR"
+            return $false
+        }
+    }
+    
+    # Create Start Menu shortcut (auto-create, no prompt)
+    if (New-Shortcut -TargetPath $InsightReaderBin -ShortcutPath $StartMenuShortcut -Description "Insight Reader - Text-to-Speech application" -IconLocation $IconPath) {
+        Write-ColorOutput "Start Menu shortcut created" "SUCCESS"
+    }
+    
+    # Create Desktop shortcut (auto-create, no prompt)
+    if (New-Shortcut -TargetPath $InsightReaderBin -ShortcutPath $DesktopShortcut -Description "Insight Reader - Text-to-Speech application" -IconLocation $IconPath) {
+        Write-ColorOutput "Desktop shortcut created" "SUCCESS"
+    }
+    
+    return $true
 }
 
 function Show-Summary {
@@ -526,9 +585,9 @@ function Main {
         }
     }
     
-    # Install OCR script
+    # OCR functionality uses built-in Windows.Media.Ocr API - no installation needed
     Write-Host ""
-    Install-OcrScript | Out-Null
+    Write-ColorOutput "OCR functionality uses Windows built-in OCR (no installation required)" "INFO"
     
     # Download model
     Write-Host ""
@@ -537,6 +596,12 @@ function Main {
     # Add to PATH
     Write-Host ""
     Add-ToPath
+    
+    # Create shortcuts (unless skipped)
+    if (-not $SkipShortcuts) {
+        Write-Host ""
+        Create-Shortcuts | Out-Null
+    }
     
     # Show summary
     Show-Summary

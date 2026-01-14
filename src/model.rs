@@ -151,6 +151,8 @@ pub struct App {
     pub voices: Option<HashMap<String, VoiceInfo>>,
     /// All available voices from AWS Polly
     pub polly_voices: Option<HashMap<String, PollyVoiceInfo>>,
+    /// Error message from AWS Polly voice loading (service errors, not credential errors)
+    pub polly_error_message: Option<String>,
     /// Selected AWS Polly voice ID (e.g., "Matthew", "Joanna")
     pub selected_polly_voice: Option<String>,
     /// Voice selection window ID
@@ -204,6 +206,7 @@ impl Default for App {
             selected_language: None,
             voices: None,
             polly_voices: None,
+            polly_error_message: None,
             selected_polly_voice: None,
             voice_selection_window_id: None,
             downloading_voice: None,
@@ -251,6 +254,7 @@ impl App {
             selected_language: None,
             voices: None,
             polly_voices: None,
+            polly_error_message: None,
             selected_polly_voice: config::load_selected_polly_voice(),
             voice_selection_window_id: None,
             downloading_voice: None,

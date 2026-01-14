@@ -7,11 +7,11 @@ mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 
-/// Extracts text from an image using macOS Vision framework, Linux EasyOCR, or Windows EasyOCR.
+/// Extracts text from an image using platform-native OCR APIs.
 /// 
-/// On macOS, uses AppleScript to call the Vision framework for OCR.
+/// On macOS, uses Swift script with Vision framework for OCR.
 /// On Linux, uses EasyOCR via Python script.
-/// On Windows, uses EasyOCR via Python script.
+/// On Windows, uses built-in Windows.Media.Ocr API (no external dependencies required).
 /// Returns the extracted text, or an error message.
 pub fn extract_text_from_image(image_path: &str) -> Result<String, String> {
     #[cfg(target_os = "macos")]

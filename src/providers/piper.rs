@@ -6,6 +6,9 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use tracing::{debug, error, info, warn};
 
 use super::audio_player::AudioPlayer;
@@ -144,19 +147,39 @@ impl PiperTTSProvider {
         // Check system PATH
         // On Windows use 'where', on Unix use 'which'
         #[cfg(target_os = "windows")]
-        let path_cmd = "where";
+        {
+            let path_cmd = "where";
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            if let Ok(output) = Command::new(path_cmd)
+                .arg("piper")
+                .creation_flags(CREATE_NO_WINDOW)
+                .output()
+            {
+                if output.status.success() {
+                    if let Ok(path_str) = String::from_utf8(output.stdout) {
+                        // 'where' on Windows may return multiple lines, take the first
+                        let trimmed = path_str.lines().next().unwrap_or("").trim();
+                        if !trimmed.is_empty() {
+                            let path_buf = PathBuf::from(trimmed);
+                            debug!(path = %path_buf.display(), "Using piper from PATH");
+                            return path_buf;
+                        }
+                    }
+                }
+            }
+        }
         #[cfg(not(target_os = "windows"))]
-        let path_cmd = "which";
-        
-        if let Ok(output) = Command::new(path_cmd).arg("piper").output() {
-            if output.status.success() {
-                if let Ok(path_str) = String::from_utf8(output.stdout) {
-                    // 'where' on Windows may return multiple lines, take the first
-                    let trimmed = path_str.lines().next().unwrap_or("").trim();
-                    if !trimmed.is_empty() {
-                        let path_buf = PathBuf::from(trimmed);
-                        debug!(path = %path_buf.display(), "Using piper from PATH");
-                        return path_buf;
+        {
+            let path_cmd = "which";
+            if let Ok(output) = Command::new(path_cmd).arg("piper").output() {
+                if output.status.success() {
+                    if let Ok(path_str) = String::from_utf8(output.stdout) {
+                        let trimmed = path_str.trim();
+                        if !trimmed.is_empty() {
+                            let path_buf = PathBuf::from(trimmed);
+                            debug!(path = %path_buf.display(), "Using piper from PATH");
+                            return path_buf;
+                        }
                     }
                 }
             }
@@ -305,6 +328,8 @@ impl TTSProvider for PiperTTSProvider {
             debug!(temp_file = %temp_file_str, "Using temp file for piper output (Windows)");
             
             // Run piper with temp file output
+            // Use CREATE_NO_WINDOW flag to prevent console window from appearing
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
             let mut child = Command::new(&self.piper_bin)
                 .args([
                     "--model",
@@ -315,6 +340,7 @@ impl TTSProvider for PiperTTSProvider {
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
+                .creation_flags(CREATE_NO_WINDOW)
                 .spawn()
                 .map_err(|e| {
                     error!(
