@@ -3,6 +3,7 @@
 use iced::widget::{button, checkbox, column, container, mouse_area, progress_bar, radio, row, scrollable, svg, text, text_editor, Space};
 use iced::{Alignment, Background, Color, ContentFit, Element, Length};
 
+use crate::flags;
 use crate::model::{App, LanguageInfo, LogLevel, Message, OCRBackend, PlaybackState, TTSBackend};
 use crate::styles::{
     circle_button_style, close_button_style, error_container_style, header_style,
@@ -22,181 +23,6 @@ fn engine_display_name(engine: &str) -> &str {
         "Generative" => "Generative",
         "LongForm" => "Long-Form",
         _ => engine,
-    }
-}
-
-/// Get flag emoji for a language code
-fn get_flag_emoji(lang_code: &str) -> &'static str {
-    // Extract country code from language code (e.g., "pt_BR" -> "BR")
-    let country = lang_code.split('_').nth(1).unwrap_or("");
-    
-    match country {
-        // Portuguese variants
-        "BR" => "🇧🇷",
-        "PT" => "🇵🇹",
-        // English variants
-        "US" => "🇺🇸",
-        "GB" => "🇬🇧",
-        "AU" => "🇦🇺",
-        "CA" => "🇨🇦",
-        // Spanish variants
-        "ES" => "🇪🇸",
-        "MX" => "🇲🇽",
-        "AR" => "🇦🇷",
-        "CO" => "🇨🇴",
-        // French variants
-        "FR" => "🇫🇷",
-        // German variants
-        "DE" => "🇩🇪",
-        "AT" => "🇦🇹",
-        "CH" => "🇨🇭",
-        // Other European
-        "IT" => "🇮🇹",
-        "NL" => "🇳🇱",
-        "PL" => "🇵🇱",
-        "RU" => "🇷🇺",
-        "TR" => "🇹🇷",
-        "GR" => "🇬🇷",
-        "CZ" => "🇨🇿",
-        "SK" => "🇸🇰",
-        "HU" => "🇭🇺",
-        "RO" => "🇷🇴",
-        "BG" => "🇧🇬",
-        "HR" => "🇭🇷",
-        "SI" => "🇸🇮",
-        "FI" => "🇫🇮",
-        "SV" => "🇸🇪",
-        "NO" => "🇳🇴",
-        "DA" => "🇩🇰",
-        "IS" => "🇮🇸",
-        "EE" => "🇪🇪",
-        "LV" => "🇱🇻",
-        "LT" => "🇱🇹",
-        // Asian
-        "CN" => "🇨🇳",
-        "TW" => "🇹🇼",
-        "HK" => "🇭🇰",
-        "JP" => "🇯🇵",
-        "KR" => "🇰🇷",
-        "VN" => "🇻🇳",
-        "TH" => "🇹🇭",
-        "ID" => "🇮🇩",
-        "MY" => "🇲🇾",
-        "PH" => "🇵🇭",
-        "IN" => "🇮🇳",
-        "PK" => "🇵🇰",
-        "BD" => "🇧🇩",
-        // Middle East
-        "SA" => "🇸🇦",
-        "AE" => "🇦🇪",
-        "IL" => "🇮🇱",
-        "IR" => "🇮🇷",
-        "IQ" => "🇮🇶",
-        "JO" => "🇯🇴",
-        // African
-        "ZA" => "🇿🇦",
-        "EG" => "🇪🇬",
-        "KE" => "🇰🇪",
-        "NG" => "🇳🇬",
-        // Americas
-        "CL" => "🇨🇱",
-        "PE" => "🇵🇪",
-        "VE" => "🇻🇪",
-        "EC" => "🇪🇨",
-        "BO" => "🇧🇴",
-        "PY" => "🇵🇾",
-        "UY" => "🇺🇾",
-        "CR" => "🇨🇷",
-        "PA" => "🇵🇦",
-        "DO" => "🇩🇴",
-        "CU" => "🇨🇺",
-        // Fallback: use language family
-        _ => {
-            let lang_family = lang_code.split('_').next().unwrap_or("");
-            match lang_family {
-                "ar" => "🇸🇦", // Arabic
-                "zh" => "🇨🇳", // Chinese
-                "hi" => "🇮🇳", // Hindi
-                "ja" => "🇯🇵", // Japanese
-                "ko" => "🇰🇷", // Korean
-                "th" => "🇹🇭", // Thai
-                "vi" => "🇻🇳", // Vietnamese
-                "cs" => "🇨🇿", // Czech
-                "sk" => "🇸🇰", // Slovak
-                "hu" => "🇭🇺", // Hungarian
-                "ro" => "🇷🇴", // Romanian
-                "bg" => "🇧🇬", // Bulgarian
-                "hr" => "🇭🇷", // Croatian
-                "sr" => "🇷🇸", // Serbian
-                "sl" => "🇸🇮", // Slovenian
-                "et" => "🇪🇪", // Estonian
-                "lv" => "🇱🇻", // Latvian
-                "lt" => "🇱🇹", // Lithuanian
-                "fi" => "🇫🇮", // Finnish
-                "sv" => "🇸🇪", // Swedish
-                "no" => "🇳🇴", // Norwegian
-                "da" => "🇩🇰", // Danish
-                "is" => "🇮🇸", // Icelandic
-                "ca" => "🇪🇸", // Catalan
-                "eu" => "🇪🇸", // Basque
-                "gl" => "🇪🇸", // Galician
-                "uk" => "🇺🇦", // Ukrainian
-                "be" => "🇧🇾", // Belarusian
-                "mk" => "🇲🇰", // Macedonian
-                "sq" => "🇦🇱", // Albanian
-                "mt" => "🇲🇹", // Maltese
-                "ga" => "🇮🇪", // Irish
-                "cy" => "🇬🇧", // Welsh
-                "he" => "🇮🇱", // Hebrew
-                "fa" => "🇮🇷", // Persian
-                "ur" => "🇵🇰", // Urdu
-                "bn" => "🇧🇩", // Bengali
-                "ta" => "🇮🇳", // Tamil
-                "te" => "🇮🇳", // Telugu
-                "ml" => "🇮🇳", // Malayalam
-                "kn" => "🇮🇳", // Kannada
-                "gu" => "🇮🇳", // Gujarati
-                "pa" => "🇮🇳", // Punjabi
-                "mr" => "🇮🇳", // Marathi
-                "ne" => "🇳🇵", // Nepali
-                "si" => "🇱🇰", // Sinhala
-                "my" => "🇲🇲", // Burmese
-                "km" => "🇰🇭", // Khmer
-                "lo" => "🇱🇦", // Lao
-                "ka" => "🇬🇪", // Georgian
-                "hy" => "🇦🇲", // Armenian
-                "az" => "🇦🇿", // Azerbaijani
-                "kk" => "🇰🇿", // Kazakh
-                "ky" => "🇰🇬", // Kyrgyz
-                "uz" => "🇺🇿", // Uzbek
-                "mn" => "🇲🇳", // Mongolian
-                "sw" => "🇰🇪", // Swahili
-                "af" => "🇿🇦", // Afrikaans
-                "am" => "🇪🇹", // Amharic
-                "yo" => "🇳🇬", // Yoruba
-                "ig" => "🇳🇬", // Igbo
-                "ha" => "🇳🇬", // Hausa
-                "zu" => "🇿🇦", // Zulu
-                "xh" => "🇿🇦", // Xhosa
-                "st" => "🇿🇦", // Southern Sotho
-                "tn" => "🇿🇦", // Tswana
-                "sn" => "🇿🇼", // Shona
-                "ny" => "🇲🇼", // Chichewa
-                "so" => "🇸🇴", // Somali
-                "om" => "🇪🇹", // Oromo
-                "ti" => "🇪🇷", // Tigrinya
-                "mg" => "🇲🇬", // Malagasy
-                "rw" => "🇷🇼", // Kinyarwanda
-                "lg" => "🇺🇬", // Ganda
-                "ak" => "🇬🇭", // Akan
-                "ff" => "🇸🇳", // Fulah
-                "wo" => "🇸🇳", // Wolof
-                "bm" => "🇲🇱", // Bambara
-                "ee" => "🇬🇭", // Ewe
-                "tw" => "🇬🇭", // Twi
-                _ => "🌐", // Default globe emoji
-            }
-        }
     }
 }
 
@@ -415,22 +241,27 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
             
             // Show all languages in a grid
             for (lang_code, lang_info) in languages.iter() {
-                let flag_emoji = get_flag_emoji(lang_code);
-                let label = format!("{} {} ({})", flag_emoji, lang_info.name_english, lang_code);
+                let flag_icon = flags::get_flag_icon(lang_code);
+                let label_text = format!("{} ({})", lang_info.name_english, lang_code);
                 let lang_code_clone = lang_code.clone();
                 let is_selected = app.selected_language.as_deref() == Some(lang_code);
                 
-                // Create button with owned string - clicking opens voice selection immediately
+                // Create button with SVG flag + text label
                 let lang_button = button(
                     container(
-                        text(label).size(13)
-                            .style(move |_theme| iced::widget::text::Style {
-                                color: Some(if is_selected {
-                                    Color::WHITE
-                                } else {
-                                    Color::from_rgba(1.0, 1.0, 1.0, 0.7)
-                                }),
-                            })
+                        row![
+                            flag_icon,
+                            Space::new().width(Length::Fixed(6.0)),
+                            text(label_text).size(13)
+                                .style(move |_theme| iced::widget::text::Style {
+                                    color: Some(if is_selected {
+                                        Color::WHITE
+                                    } else {
+                                        Color::from_rgba(1.0, 1.0, 1.0, 0.7)
+                                    }),
+                                })
+                        ]
+                        .align_y(Alignment::Center)
                     )
                     .padding([5.0, 8.0])
                     .width(Length::Fill)
@@ -551,22 +382,27 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
             
             // Show all languages in a grid
             for (lang_code, lang_info) in languages.iter() {
-                let flag_emoji = get_flag_emoji(lang_code);
-                let label = format!("{} {} ({})", flag_emoji, lang_info.name_english, lang_code);
+                let flag_icon = flags::get_flag_icon(lang_code);
+                let label_text = format!("{} ({})", lang_info.name_english, lang_code);
                 let lang_code_clone = lang_code.clone();
                 let is_selected = app.selected_language.as_deref() == Some(lang_code);
                 
-                // Create button with owned string - clicking opens voice selection immediately
+                // Create button with SVG flag + text label
                 let lang_button = button(
                     container(
-                        text(label).size(13)
-                            .style(move |_theme| iced::widget::text::Style {
-                                color: Some(if is_selected {
-                                    Color::WHITE
-                                } else {
-                                    Color::from_rgba(1.0, 1.0, 1.0, 0.7)
-                                }),
-                            })
+                        row![
+                            flag_icon,
+                            Space::new().width(Length::Fixed(6.0)),
+                            text(label_text).size(13)
+                                .style(move |_theme| iced::widget::text::Style {
+                                    color: Some(if is_selected {
+                                        Color::WHITE
+                                    } else {
+                                        Color::from_rgba(1.0, 1.0, 1.0, 0.7)
+                                    }),
+                                })
+                        ]
+                        .align_y(Alignment::Center)
                     )
                     .padding([5.0, 8.0])
                     .width(Length::Fill)
@@ -1197,9 +1033,9 @@ pub fn voice_selection_window_view<'a>(app: &'a App) -> Element<'a, Message> {
         .into()
     };
 
-    // Get language name for header (outside the voice_list scope)
-    let language_name: String = if let Some(lang_code) = &app.selected_language {
-        let flag_emoji = get_flag_emoji(lang_code);
+    // Get language info for header (outside the voice_list scope)
+    let (header_flag_icon, language_name): (Element<'a, Message>, String) = if let Some(lang_code) = &app.selected_language {
+        let flag_icon = flags::get_flag_icon(lang_code);
         
         let lang_info: Option<LanguageInfo> = match app.selected_backend {
             TTSBackend::Piper => app.voices.as_ref().and_then(|v| {
@@ -1216,21 +1052,29 @@ pub fn voice_selection_window_view<'a>(app: &'a App) -> Element<'a, Message> {
             }),
         };
         
-        if let Some(lang_info) = lang_info {
-            format!("{} {} ({})", flag_emoji, lang_info.name_english, lang_code)
+        let name = if let Some(lang_info) = lang_info {
+            format!("{} ({})", lang_info.name_english, lang_code)
         } else {
-            format!("{} {}", flag_emoji, lang_code)
-        }
+            lang_code.to_string()
+        };
+        (flag_icon.into(), name)
     } else {
-        "Unknown Language".to_string()
+        // Fallback: globe icon for unknown language
+        let globe_icon = flags::get_flag_icon("unknown");
+        (globe_icon.into(), "Unknown Language".to_string())
     };
 
     container(
         column![
             container(
                 row![
-                    text(format!("Select voice in {}", language_name))
-                        .size(18)
+                    text("Select voice in ").size(18)
+                        .style(|_theme| iced::widget::text::Style {
+                            color: Some(Color::WHITE),
+                        }),
+                    header_flag_icon,
+                    Space::new().width(Length::Fixed(6.0)),
+                    text(language_name).size(18)
                         .style(|_theme| iced::widget::text::Style {
                             color: Some(Color::WHITE),
                         }),
