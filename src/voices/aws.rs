@@ -3,7 +3,7 @@
 //! Handles fetching and organizing voices from AWS Polly using the AWS SDK.
 
 use std::collections::HashMap;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::model::LanguageInfo;
 
@@ -19,11 +19,11 @@ pub struct PollyVoiceInfo {
 
 /// Fetch voices from AWS Polly using the AWS SDK
 pub async fn fetch_polly_voices() -> Result<HashMap<String, PollyVoiceInfo>, String> {
-    debug!("Fetching voices from AWS Polly");
+    debug!("AWS Polly: starting fetch_polly_voices");
 
     // Determine region: check ~/.aws/config, env vars, or default to us-east-1
     let region = detect_aws_region();
-    debug!(region = %region, "Using AWS region for voice fetching");
+    debug!(region = %region, "AWS Polly: using region for voice fetching");
 
     // Load AWS config (credentials from ~/.aws/credentials or env vars)
     // This is async and will use the existing tokio runtime from Iced
@@ -33,9 +33,10 @@ pub async fn fetch_polly_voices() -> Result<HashMap<String, PollyVoiceInfo>, Str
         .await;
 
     let client = aws_sdk_polly::Client::new(&config);
-    debug!("AWS Polly client created for voice fetching");
+    debug!("AWS Polly: client created for voice fetching");
 
     // Fetch all voices from AWS Polly
+    debug!("AWS Polly: calling DescribeVoices without filters");
     let response = client
         .describe_voices()
         .send()
@@ -44,7 +45,10 @@ pub async fn fetch_polly_voices() -> Result<HashMap<String, PollyVoiceInfo>, Str
 
     let aws_voices = response.voices();
     let voices_vec: Vec<aws_sdk_polly::types::Voice> = aws_voices.iter().cloned().collect();
-    debug!(count = voices_vec.len(), "Received voices from AWS Polly");
+    debug!(
+        count = voices_vec.len(),
+        "AWS Polly: received voices from DescribeVoices"
+    );
 
     // Convert AWS voices to our internal format
     // Create separate entries for each engine type a voice supports
@@ -56,6 +60,15 @@ pub async fn fetch_polly_voices() -> Result<HashMap<String, PollyVoiceInfo>, Str
         let language_code = voice.language_code().map(|l| l.as_str().to_string());
         let gender = voice.gender().map(|g| format!("{:?}", g));
         let supported_engines = voice.supported_engines();
+
+        trace!(
+            id = voice_id.as_deref().unwrap_or("<none>"),
+            name = name.as_deref().unwrap_or("<none>"),
+            language_code = language_code.as_deref().unwrap_or("<none>"),
+            gender = gender.as_deref().unwrap_or("<none>"),
+            engines = ?supported_engines,
+            "AWS Polly: raw voice from DescribeVoices"
+        );
 
         if let (Some(id), Some(lang_code)) = (voice_id, language_code) {
             // Create language info from AWS language code
@@ -80,7 +93,10 @@ pub async fn fetch_polly_voices() -> Result<HashMap<String, PollyVoiceInfo>, Str
         }
     }
 
-    debug!(count = voices.len(), "Converted AWS voices to internal format");
+    debug!(
+        count = voices.len(),
+        "AWS Polly: converted AWS voices to internal format"
+    );
     Ok(voices)
 }
 

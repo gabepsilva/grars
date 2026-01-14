@@ -78,6 +78,11 @@ pub enum Message {
     CopyExtractedTextToClipboard, // Copy extracted text to clipboard
     ExtractedTextEditorAction(iced::widget::text_editor::Action), // Text editor action (edit, paste, etc.)
     ReadExtractedText, // Send extracted text to TTS and start reading
+    ShowWindow, // Show the main window (from tray menu)
+    HideWindow, // Hide the main window (from tray menu)
+    ReadSelected, // Read currently selected text (from tray menu)
+    Quit, // Quit the application (from tray menu)
+    TrayEventReceived, // Poll for tray events
 }
 
 /// Voice metadata from piper-voices repository
@@ -172,6 +177,10 @@ pub struct App {
     pub extracted_text: Option<String>,
     /// Text editor content state for the extracted text dialog
     pub extracted_text_editor: Option<iced::widget::text_editor::Content>,
+    /// System tray handle (for menu bar icon)
+    pub system_tray: Option<crate::system::SystemTray>,
+    /// Whether the main window is hidden (minimized to tray)
+    pub window_hidden: bool,
 }
 
 impl Default for App {
@@ -210,6 +219,8 @@ impl Default for App {
             extracted_text_dialog_window_id: None,
             extracted_text: None,
             extracted_text_editor: None,
+            system_tray: None,
+            window_hidden: false,
         }
     }
 }
@@ -256,6 +267,8 @@ impl App {
             extracted_text_dialog_window_id: None,
             extracted_text: None,
             extracted_text_editor: None,
+            system_tray: None,
+            window_hidden: false,
         }
     }
 }

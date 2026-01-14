@@ -11,7 +11,18 @@ use crate::view;
 
 pub fn new() -> (App, Task<Message>) {
     // Create app immediately without waiting for anything
-    let app = App::new(None);
+    let mut app = App::new(None);
+    
+    // Initialize system tray
+    match crate::system::SystemTray::new() {
+        Ok(tray) => {
+            app.system_tray = Some(tray);
+            info!("System tray initialized successfully");
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to initialize system tray, continuing without it");
+        }
+    }
     
     info!("App created, opening UI immediately");
     
@@ -156,5 +167,12 @@ pub fn subscription(app: &App) -> Subscription<Message> {
         _ => time::every(Duration::from_millis(75)).map(|_| Message::Tick),
     };
     
-    Subscription::batch(vec![window_opened, window_closed, tick])
+    // Poll for system tray events periodically (every 100ms)
+    let tray_poll = if app.system_tray.is_some() {
+        time::every(Duration::from_millis(100)).map(|_| Message::TrayEventReceived)
+    } else {
+        Subscription::none()
+    };
+    
+    Subscription::batch(vec![window_opened, window_closed, tick, tray_poll])
 }

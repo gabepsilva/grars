@@ -115,6 +115,47 @@ fn close_window_if_some(window_id: Option<window::Id>) -> Task<Message> {
     window_id.map_or_else(Task::none, window::close)
 }
 
+/// Open the main window with standard settings.
+/// Returns the window ID and task mapped to Message::WindowOpened.
+fn open_main_window() -> (window::Id, Task<Message>) {
+    let (window_id, task) = window::open(window::Settings {
+        size: Size::new(410.0, 70.0),
+        resizable: false,
+        decorations: false,
+        transparent: true,
+        visible: true,
+        level: window::Level::AlwaysOnTop,
+        position: window::Position::SpecificWith(|window_size, monitor_size| {
+            let margin = 70.0;
+            iced::Point::new(
+                margin,
+                monitor_size.height - window_size.height - margin,
+            )
+        }),
+        ..Default::default()
+    });
+    (window_id, task.map(Message::WindowOpened))
+}
+
+/// Fetch selected text asynchronously.
+/// Returns a Task that will complete with SelectedTextFetched message.
+fn fetch_selected_text_task(context: &'static str) -> Task<Message> {
+    Task::perform(
+        async move {
+            debug!("Fetching selected text: {}", context);
+            let result = tokio::task::spawn_blocking(|| {
+                crate::system::get_selected_text()
+            })
+            .await;
+            result.unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "Failed to join blocking task for text fetch");
+                None
+            })
+        },
+        Message::SelectedTextFetched,
+    )
+}
+
 /// Open settings window if not already open, setting error message and modal state.
 /// Returns the task if window was opened, otherwise Task::none().
 fn open_settings_if_needed(app: &mut App, error_msg: String) -> Task<Message> {
@@ -444,10 +485,17 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             if app.current_window_id == Some(id) {
                 app.current_window_id = None;
             }
-            // Exit when the main window is closed
+            // Hide window instead of exiting if system tray is available
             if app.main_window_id == Some(id) {
-                info!("Main window closed, exiting");
-                return iced::exit();
+                if app.system_tray.is_some() {
+                    info!("Main window closed, hiding to system tray");
+                    app.window_hidden = true;
+                    // Don't clear main_window_id so we know to reopen it later
+                    // The window is already closed by the user, so we just mark it as hidden
+                } else {
+                    info!("Main window closed, exiting (no system tray)");
+                    return iced::exit();
+                }
             }
             Task::none()
         }
@@ -944,6 +992,58 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             // Don't close the dialog - keep it open so user can edit and read again if needed
             // Process text for TTS (this will handle Natural Reading if enabled)
             process_text_for_tts(app, text_to_read, "ReadExtractedText")
+        }
+        Message::TrayEventReceived => {
+            // Poll for tray events and convert them to messages
+            if let Some(ref tray) = app.system_tray {
+                if let Some(event) = tray.try_recv() {
+                    let message = match event {
+                        crate::system::TrayEvent::ShowWindow => Message::ShowWindow,
+                        crate::system::TrayEvent::HideWindow => Message::HideWindow,
+                        crate::system::TrayEvent::ReadSelected => Message::ReadSelected,
+                        crate::system::TrayEvent::Quit => Message::Quit,
+                    };
+                    return Task::perform(async { message }, |msg| msg);
+                }
+            }
+            Task::none()
+        }
+        Message::ShowWindow => {
+            // Reopen the window if it was hidden/closed
+            if app.window_hidden || app.main_window_id.is_none() {
+                info!("Reopening main window from tray");
+                let (window_id, open_task) = open_main_window();
+                app.main_window_id = Some(window_id);
+                app.window_hidden = false;
+                return open_task;
+            }
+            Task::none()
+        }
+        Message::HideWindow => {
+            // Close the window (user can reopen from tray)
+            if let Some(window_id) = app.main_window_id {
+                info!("Hiding main window to tray");
+                app.window_hidden = true;
+                return window::close(window_id);
+            }
+            Task::none()
+        }
+        Message::ReadSelected => {
+            info!("Read Selected triggered from tray menu");
+            // Ensure window is visible when reading
+            let fetch_task = fetch_selected_text_task("tray menu");
+            if app.window_hidden || app.main_window_id.is_none() {
+                // Show window first, then fetch text
+                let (window_id, open_task) = open_main_window();
+                app.main_window_id = Some(window_id);
+                app.window_hidden = false;
+                return Task::batch([open_task, fetch_task]);
+            }
+            fetch_task
+        }
+        Message::Quit => {
+            info!("Quitting application from tray menu");
+            iced::exit()
         }
     }
 }

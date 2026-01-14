@@ -23,6 +23,7 @@ pulldown-cmark = "0.9"  # Markdown parser for stripping formatting
 md5 = "0.7"            # MD5 checksum verification for voice downloads
 arboard = { version = "3.2", features = ["wayland-data-control"] }  # Cross-platform clipboard library
 open = "5.0"            # Cross-platform URL/file opening
+tray-icon = "0.13"     # System tray icon support
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.9" # Core Foundation types for macOS Accessibility API
