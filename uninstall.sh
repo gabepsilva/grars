@@ -58,6 +58,7 @@ fi
 CONFIG_FILE="$HOME/.config/insight-reader/config.json"
 CONFIG_DIR="$HOME/.config/insight-reader"
 LOG_DIR="$HOME/.local/share/insight-reader/logs"
+CACHE_INSTALL_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/insight-reader-install"
 
 # Parse arguments
 FORCE_PROJECT_ROOT=false
@@ -194,6 +195,9 @@ if [ "$CLEAN_USER" = true ]; then
     fi
     if [ -d "$LOG_DIR" ]; then
         ITEMS_TO_REMOVE+=("Log directory: $LOG_DIR")
+    fi
+    if [ -d "$CACHE_INSTALL_DIR" ]; then
+        ITEMS_TO_REMOVE+=("Install cache directory: $CACHE_INSTALL_DIR")
     fi
 fi
 
@@ -344,13 +348,18 @@ if [ "$CLEAN_USER" = true ]; then
         log_success "Removed log directory"
     fi
     
-    # Remove user directory if it's empty
+    # Remove user directory (fully remove, not just when empty)
     if [ -d "$USER_DIR" ]; then
-        if [ -z "$(ls -A "$USER_DIR" 2>/dev/null)" ]; then
-            log_info "Removing empty user directory: $USER_DIR"
-            rmdir "$USER_DIR"
-            log_success "Removed empty user directory"
-        fi
+        log_info "Removing user directory: $USER_DIR"
+        rm -rf "$USER_DIR"
+        log_success "Removed user directory"
+    fi
+    
+    # Remove install cache directory
+    if [ -d "$CACHE_INSTALL_DIR" ]; then
+        log_info "Removing install cache directory: $CACHE_INSTALL_DIR"
+        rm -rf "$CACHE_INSTALL_DIR"
+        log_success "Removed install cache directory"
     fi
 fi
 

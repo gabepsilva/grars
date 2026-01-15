@@ -63,6 +63,7 @@ if ($Help) {
     Write-Host "  - Start Menu shortcut (if created)"
     Write-Host "  - Desktop shortcut (if created)"
     Write-Host "  - insight-reader from PATH (if added)"
+    Write-Host "  - Installation directory: $InstallDir"
     Write-Host ""
     exit 0
 }
@@ -111,6 +112,11 @@ function Main {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if ($userPath -like "*$BinDir*") {
         $itemsToRemove += "PATH entry: $BinDir"
+    }
+    
+    # Add installation directory to removal list (will be fully removed)
+    if (Test-Path $InstallDir) {
+        $itemsToRemove += "Installation directory: $InstallDir"
     }
     
     # If nothing to remove, exit
@@ -258,17 +264,12 @@ function Main {
         Write-ColorOutput "Removed from PATH. Please restart your terminal for changes to take effect." "SUCCESS"
     }
     
-    # Remove main installation directory if empty
+    # Remove main installation directory (fully remove, not just when empty)
     if (Test-Path $InstallDir) {
+        Write-ColorOutput "Removing installation directory: $InstallDir" "INFO"
         try {
-            $installContents = Get-ChildItem -Path $InstallDir -ErrorAction SilentlyContinue
-            if ($null -eq $installContents -or $installContents.Count -eq 0) {
-                Write-ColorOutput "Removing empty installation directory: $InstallDir" "INFO"
-                Remove-Item -Path $InstallDir -Force -ErrorAction Stop
-                Write-ColorOutput "Removed installation directory" "SUCCESS"
-            } else {
-                Write-ColorOutput "Installation directory not empty, keeping: $InstallDir" "INFO"
-            }
+            Remove-Item -Path $InstallDir -Recurse -Force -ErrorAction Stop
+            Write-ColorOutput "Removed installation directory" "SUCCESS"
         } catch {
             Write-ColorOutput "Failed to remove installation directory: $_" "WARN"
         }

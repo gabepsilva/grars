@@ -14,6 +14,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Detect if script is being piped (e.g., Invoke-WebRequest | Invoke-Expression)
+# Check if stdin is redirected or if script path is not available
+$IsPiped = $false
+if ([Console]::IsInputRedirected) {
+    $IsPiped = $true
+} elseif (-not $PSCommandPath -or $PSCommandPath -eq "") {
+    # Script is being executed from stdin (piped)
+    $IsPiped = $true
+} elseif (-not (Test-Path $PSCommandPath)) {
+    # Script path doesn't exist (likely piped)
+    $IsPiped = $true
+}
+
 # Configuration
 $AppName = "insight-reader"
 $GithubRepo = "gabepsilva/insight-reader"
@@ -213,19 +226,24 @@ function Install-Binary {
     # Create directories
     New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
     
-    # Check for local binary first (development)
-    $localBinary = $null
-    if (Test-Path "target\release\insight-reader.exe") {
-        $localBinary = "target\release\insight-reader.exe"
-    } elseif (Test-Path "insight-reader.exe") {
-        $localBinary = "insight-reader.exe"
-    }
-    
-    if ($localBinary) {
-        Write-ColorOutput "Found local binary at $localBinary" "INFO"
-        Copy-Item $localBinary $InsightReaderBin -Force
-        Write-ColorOutput "Binary copied to $InsightReaderBin" "SUCCESS"
-        return
+    # Skip local checks if script is being piped
+    if ($IsPiped) {
+        Write-ColorOutput "Script is being piped, skipping local file checks and downloading from GitHub..." "INFO"
+    } else {
+        # Check for local binary first (development)
+        $localBinary = $null
+        if (Test-Path "target\release\insight-reader.exe") {
+            $localBinary = "target\release\insight-reader.exe"
+        } elseif (Test-Path "insight-reader.exe") {
+            $localBinary = "insight-reader.exe"
+        }
+        
+        if ($localBinary) {
+            Write-ColorOutput "Found local binary at $localBinary" "INFO"
+            Copy-Item $localBinary $InsightReaderBin -Force
+            Write-ColorOutput "Binary copied to $InsightReaderBin" "SUCCESS"
+            return
+        }
     }
     
     # Download from GitHub
@@ -438,39 +456,42 @@ function Create-Shortcuts {
     
     # Get ICO logo (check local first, then download from GitHub)
     $IconPath = "$InsightReaderBin,0"  # Default to executable icon
-    
-    # Check for local ICO file first (for development)
-    # Try multiple methods to get script directory
-    $ScriptDir = $PSScriptRoot
-    if (-not $ScriptDir) {
-        $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    }
-    if (-not $ScriptDir) {
-        $ScriptDir = Split-Path -Parent $PSCommandPath
-    }
-    if (-not $ScriptDir) {
-        # Fallback: use current directory
-        $ScriptDir = Get-Location
-    }
-    
-    $ProjectRoot = Split-Path -Parent $ScriptDir
-    $LocalIco = Join-Path $ProjectRoot "assets\logo.ico"
     $IconIco = Join-Path $InstallDir "insight-reader.ico"
     
-    # Try to use local ICO file if it exists
-    if (Test-Path $LocalIco) {
-        Write-ColorOutput "Using local logo icon from: $LocalIco" "INFO"
-        try {
-            Copy-Item -Path $LocalIco -Destination $IconIco -Force -ErrorAction Stop
-            $IconPath = $IconIco
-            Write-ColorOutput "Logo icon copied to: $IconIco" "SUCCESS"
-        } catch {
-            Write-ColorOutput "Could not copy local icon, trying download..." "WARN"
-            # Fall through to download attempt
+    # Skip local checks if script is being piped
+    if (-not $IsPiped) {
+        # Check for local ICO file first (for development)
+        # Try multiple methods to get script directory
+        $ScriptDir = $PSScriptRoot
+        if (-not $ScriptDir) {
+            $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+        }
+        if (-not $ScriptDir) {
+            $ScriptDir = Split-Path -Parent $PSCommandPath
+        }
+        if (-not $ScriptDir) {
+            # Fallback: use current directory
+            $ScriptDir = Get-Location
+        }
+        
+        $ProjectRoot = Split-Path -Parent $ScriptDir
+        $LocalIco = Join-Path $ProjectRoot "assets\logo.ico"
+        
+        # Try to use local ICO file if it exists
+        if (Test-Path $LocalIco) {
+            Write-ColorOutput "Using local logo icon from: $LocalIco" "INFO"
+            try {
+                Copy-Item -Path $LocalIco -Destination $IconIco -Force -ErrorAction Stop
+                $IconPath = $IconIco
+                Write-ColorOutput "Logo icon copied to: $IconIco" "SUCCESS"
+            } catch {
+                Write-ColorOutput "Could not copy local icon, trying download..." "WARN"
+                # Fall through to download attempt
+            }
         }
     }
     
-    # If local copy failed or doesn't exist, try downloading from GitHub
+    # If local copy failed, doesn't exist, or script is piped, try downloading from GitHub
     if ($IconPath -eq "$InsightReaderBin,0") {
         $IconUrl = "https://raw.githubusercontent.com/$GithubRepo/master/assets/logo.ico"
         try {

@@ -212,6 +212,27 @@ install_ocr_script() {
     SCRIPT_FILE="$SCRIPT_DIR/extract_text_from_image.swift"
     mkdir -p "$SCRIPT_DIR"
     
+    # Skip local checks if script is being piped (curl | bash)
+    if is_piped; then
+        log_info "Script is being piped, downloading from GitHub..."
+        SCRIPT_URL="https://raw.githubusercontent.com/$GITHUB_REPO/master/install/extract_text_from_image.swift"
+        
+        local temp_script
+        temp_script=$(mktemp)
+        if download_file "$SCRIPT_URL" "$temp_script"; then
+            cp "$temp_script" "$SCRIPT_FILE"
+            chmod +x "$SCRIPT_FILE"
+            rm -f "$temp_script" 2>/dev/null || true
+            log_success "OCR script downloaded and installed to $SCRIPT_FILE"
+            return 0
+        else
+            log_warn "Failed to download extract_text_from_image.swift from GitHub"
+            log_warn "OCR functionality may not work if script is not found at runtime"
+            rm -f "$temp_script" 2>/dev/null || true
+            return 1
+        fi
+    fi
+    
     # Try to copy from local directory first (project root)
     if [ -f "install/extract_text_from_image.swift" ]; then
         log_info "Copying extract_text_from_image.swift from local directory to $SCRIPT_FILE"

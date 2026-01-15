@@ -46,6 +46,21 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Check if script is being piped (e.g., curl | bash)
+# Returns true if piped, false if run directly
+is_piped() {
+    # Check if IS_PIPED is set (from install.sh)
+    if [ "${IS_PIPED:-false}" = "true" ]; then
+        return 0
+    fi
+    # Fallback: check if stdin is not a terminal
+    if [ ! -t 0 ]; then
+        return 0
+    fi
+    # Not piped
+    return 1
+}
+
 # Download file using curl or wget (whichever is available)
 download_file() {
     local url="$1"
@@ -370,6 +385,17 @@ install_binary() {
     
     # Ensure bin directory exists
     mkdir -p "$BIN_DIR"
+    
+    # Skip local checks if script is being piped (curl | bash)
+    if is_piped; then
+        log_info "Script is being piped, skipping local file checks and downloading from GitHub..."
+        if download_and_install_binary; then
+            return 0
+        else
+            log_error "Failed to download binary from GitHub"
+            return 1
+        fi
+    fi
     
     # Try to copy from local target/release directory
     local local_binary=""

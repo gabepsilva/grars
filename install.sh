@@ -6,13 +6,24 @@ set -euo pipefail
 
 OS=$(uname -s)
 # Handle case where script is piped from curl (BASH_SOURCE[0] may be unbound)
-if [ -n "${BASH_SOURCE[0]:-}" ]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Detect if script is being piped (stdin is not a terminal)
+if [ -t 0 ]; then
+    # Not piped - stdin is a terminal
+    IS_PIPED=false
+    if [ -n "${BASH_SOURCE[0]:-}" ]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    else
+        SCRIPT_DIR="${PWD:-$HOME}"
+    fi
 else
-    # Script is being piped, use current directory or home directory
+    # Piped - stdin is not a terminal (e.g., curl | bash)
+    IS_PIPED=true
     SCRIPT_DIR="${PWD:-$HOME}"
 fi
 GITHUB_REPO="${GITHUB_REPO:-gabepsilva/insight-reader}"
+
+# Export IS_PIPED so platform scripts can use it
+export IS_PIPED
 
 # Use cache directory for downloaded scripts (or local install directory if in repo)
 if [ -d "$SCRIPT_DIR/install" ] && [ -f "$SCRIPT_DIR/install/common-bash.sh" ]; then
