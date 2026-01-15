@@ -117,7 +117,8 @@ pub(super) fn extract_text_from_image_linux(image_path: &str) -> Result<String, 
         return Err(format!("Text extraction failed: {}", stderr.trim()));
     }
     
-    let extracted_text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    // Preserve all newlines from OCR output - only trim trailing newline from script output
+    let extracted_text = String::from_utf8_lossy(&output.stdout).trim_end().to_string();
     
     if extracted_text.is_empty() {
         warn!("No text found in image");

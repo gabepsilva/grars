@@ -130,6 +130,10 @@ Or run locally from the project directory:
    - **System dependencies**:
      - `python3` and `python3-venv` (for Piper TTS)
      - `espeak-ng` (for text processing) - Linux/macOS only
+     - **Linux system tray icon support** (optional):
+       - `gtk3` (or `gtk4`)
+       - `libappindicator3` or `libayatana-appindicator` (for tray icon)
+       - **Note for GNOME users**: GNOME removed native system tray support. Install the "AppIndicator Support" extension from [GNOME Extensions](https://extensions.gnome.org/) to display tray icons.
 
 2. **Clone and build**:
    ```bash
@@ -257,6 +261,13 @@ Enable text cleanup in settings to:
 **"Piper TTS not found"** (Windows)
 - Verify Python venv was created: `%LOCALAPPDATA%\insight-reader\venv\Scripts\piper.exe`
 - Run the installation script again: `.\install\install-windows.ps1 -Force`
+
+**"System tray icon not showing"** (Linux)
+- Ensure GTK dependencies are installed:
+  - **Arch Linux / Manjaro**: `sudo pacman -S gtk3 libappindicator-gtk3`
+  - **Debian / Ubuntu**: `sudo apt install libgtk-3-dev libappindicator3-dev`
+- **GNOME users**: Install the "AppIndicator Support" extension from [GNOME Extensions](https://extensions.gnome.org/)
+- The application will continue to work without the tray icon if dependencies are missing
 
 ```
 

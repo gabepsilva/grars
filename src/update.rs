@@ -988,10 +988,11 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 return Task::none();
             }
             
-            info!(bytes = text_to_read.len(), "Sending extracted text to TTS");
-            // Don't close the dialog - keep it open so user can edit and read again if needed
-            // Process text for TTS (this will handle Natural Reading if enabled)
-            process_text_for_tts(app, text_to_read, "ReadExtractedText")
+            info!(bytes = text_to_read.len(), "Sending extracted text to TTS (bypassing text cleanup)");
+            // OCR text: skip all preprocessing (cleanup API, markdown parsing, etc.)
+            // Send directly to TTS to preserve original formatting and line breaks
+            set_loading_state(app, "Synthesizing voice...");
+            initialize_tts_async(app.selected_backend, text_to_read, "ReadExtractedText", app.selected_polly_voice.clone())
         }
         Message::TrayEventReceived => {
             // Poll for tray events and convert them to messages

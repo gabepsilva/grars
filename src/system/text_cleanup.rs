@@ -20,6 +20,8 @@ fn markdown_to_plain_text(markdown: &str) -> String {
     for event in parser {
         match event {
             Event::Text(text) | Event::Code(text) => {
+                // Preserve newlines within text (important for plain text like OCR output)
+                // The text may contain newlines that need to be preserved
                 text_parts.push(text.to_string());
             }
             Event::SoftBreak | Event::HardBreak => {
@@ -108,8 +110,29 @@ pub async fn cleanup_text(text: &str) -> Result<String, String> {
     // Log the text before markdown cleanup
     debug!(text = %cleanup_response.cleaned_content, "Text before markdown cleanup");
 
-    // Strip markdown formatting from the response
-    let plain_text = markdown_to_plain_text(&cleanup_response.cleaned_content);
+    // Check if the response looks like plain text (no markdown syntax)
+    // If it's plain text, preserve newlines directly without markdown parsing
+    let has_markdown_syntax = cleanup_response.cleaned_content.contains('#')
+        || cleanup_response.cleaned_content.contains('*')
+        || cleanup_response.cleaned_content.contains('[')
+        || cleanup_response.cleaned_content.contains('`')
+        || cleanup_response.cleaned_content.starts_with("```");
+
+    let plain_text = if has_markdown_syntax {
+        // Contains markdown - parse it
+        markdown_to_plain_text(&cleanup_response.cleaned_content)
+    } else {
+        // Plain text - just normalize spaces within lines while preserving newlines
+        cleanup_response.cleaned_content
+            .lines()
+            .map(|line| {
+                // Normalize spaces within the line
+                line.split_whitespace().collect::<Vec<_>>().join(" ")
+            })
+            .filter(|line| !line.is_empty()) // Remove empty lines
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
 
     info!(
         original_bytes = cleanup_response.cleaned_content.len(),

@@ -23,12 +23,15 @@ pulldown-cmark = "0.9"  # Markdown parser for stripping formatting
 md5 = "0.7"            # MD5 checksum verification for voice downloads
 arboard = { version = "3.2", features = ["wayland-data-control"] }  # Cross-platform clipboard library
 open = "5.0"            # Cross-platform URL/file opening
-tray-icon = "0.13"     # System tray icon support
+tray-icon = { version = "0.13", default-features = false }  # System tray icon support (libxdo disabled - not needed for custom menu items)
 image = "0.25"         # Image decoding for tray icon
 global-hotkey = "0.5"  # Global hotkey support
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.9" # Core Foundation types for macOS Accessibility API
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"  # GTK for system tray icon support on Linux
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", features = [
