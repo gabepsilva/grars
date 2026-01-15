@@ -175,8 +175,8 @@ fn extract_text_with_windows_ocr(image_path: &str) -> Result<String, String> {
         }
     }
     
-    // Join all text parts with spaces
-    let extracted_text = extracted_text_parts.join(" ");
+    // Join all text parts with newlines to preserve line breaks
+    let extracted_text = extracted_text_parts.join("\n");
     
     if extracted_text.trim().is_empty() {
         warn!("No text found in image");
