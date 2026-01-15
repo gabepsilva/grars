@@ -555,7 +555,7 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
         }
         #[cfg(target_os = "windows")]
         {
-            "Standard OCR (Windows Ocr, local)"
+            "Standard OCR (Windows Ocr2, local)"
         }
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         {

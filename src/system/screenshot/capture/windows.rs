@@ -1,6 +1,7 @@
 //! Windows-specific screenshot capture implementation
 
 use std::env;
+use std::os::windows::process::CommandExt;
 use std::process::Command;
 use tracing::{debug, error, info};
 
@@ -196,6 +197,8 @@ pub(super) fn capture_region_windows() -> Result<String, String> {
     let script = SCREENSHOT_PS_SCRIPT.replace("$args[0]", &format!("'{}'", escaped_path));
     
     // Execute PowerShell script for region selection
+    // Use CREATE_NO_WINDOW flag to prevent console window from appearing
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
     let output = match Command::new("powershell")
         .args([
             "-NoProfile",
@@ -203,6 +206,7 @@ pub(super) fn capture_region_windows() -> Result<String, String> {
             "-ExecutionPolicy", "Bypass",
             "-Command", &script,
         ])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
     {
         Ok(output) => output,
