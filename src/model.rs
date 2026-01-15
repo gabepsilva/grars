@@ -195,6 +195,8 @@ pub struct App {
     pub hotkey_enabled: bool,
     /// Whether currently listening for hotkey input
     pub listening_for_hotkey: bool,
+    /// Whether hotkeys are disabled due to Wayland/Hyprland (not supported)
+    pub hotkeys_disabled_wayland: bool,
 }
 
 impl Default for App {
@@ -239,6 +241,7 @@ impl Default for App {
             hotkey_config: crate::system::HotkeyConfig::default(),
             hotkey_enabled: false,
             listening_for_hotkey: false,
+            hotkeys_disabled_wayland: false,
         }
     }
 }
@@ -292,6 +295,7 @@ impl App {
             hotkey_config,
             hotkey_enabled,
             listening_for_hotkey: false,
+            hotkeys_disabled_wayland: crate::system::is_wayland_hyprland(),
         }
     }
 }

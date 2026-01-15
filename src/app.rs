@@ -14,8 +14,16 @@ pub fn new() -> (App, Task<Message>) {
     // Create app immediately without waiting for anything
     let mut app = App::new(None);
     
-    // Initialize system tray
-    match crate::system::SystemTray::new(Some(&app.hotkey_config)) {
+    // Check if hotkeys are disabled due to Wayland/Hyprland
+    if app.hotkeys_disabled_wayland {
+        info!("Hotkeys disabled: not supported on Wayland with Hyprland");
+        app.hotkey_enabled = false;
+    }
+    
+    // Initialize system tray (pass None for hotkey config if disabled)
+    match crate::system::SystemTray::new(
+        if app.hotkeys_disabled_wayland { None } else { Some(&app.hotkey_config) }
+    ) {
         Ok(tray) => {
             app.system_tray = Some(tray);
             info!("System tray initialized successfully");
@@ -25,25 +33,28 @@ pub fn new() -> (App, Task<Message>) {
         }
     }
     
-    // Initialize hotkey manager
-    match crate::system::HotkeyManager::new() {
-        Ok(mut hotkey_manager) => {
-            // Register hotkey if enabled
-            if app.hotkey_enabled {
-                if let Err(e) = hotkey_manager.register(app.hotkey_config.clone()) {
-                    tracing::warn!(error = %e, "Failed to register hotkey, continuing without it");
-                    app.hotkey_enabled = false;
-                } else {
-                    info!("Hotkey registered successfully");
+    // Initialize hotkey manager (skip if disabled on Wayland/Hyprland)
+    if !app.hotkeys_disabled_wayland {
+        match crate::system::HotkeyManager::new() {
+            Ok(mut hotkey_manager) => {
+                // Register hotkey if enabled
+                if app.hotkey_enabled {
+                    if let Err(e) = hotkey_manager.register(app.hotkey_config.clone()) {
+                        tracing::warn!(error = %e, "Failed to register hotkey, continuing without it");
+                        app.hotkey_enabled = false;
+                    } else {
+                        info!("Hotkey registered successfully");
+                    }
                 }
+                app.hotkey_manager = Some(hotkey_manager);
             }
-            app.hotkey_manager = Some(hotkey_manager);
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, "Failed to initialize hotkey manager, continuing without it");
-            app.hotkey_enabled = false;
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to initialize hotkey manager, continuing without it");
+                app.hotkey_enabled = false;
+            }
         }
     }
+    // Note: app.hotkey_manager is already None by default, so no need to set it explicitly
     
     info!("App created, opening UI immediately");
     
@@ -197,7 +208,8 @@ pub fn subscription(app: &App) -> Subscription<Message> {
     
     // Poll for hotkey events periodically (every 100ms)
     // Note: The actual hotkey event checking happens in update.rs when HotkeyPressed is received
-    let hotkey_poll = if app.hotkey_manager.is_some() && app.hotkey_enabled {
+    // Skip if disabled on Wayland/Hyprland
+    let hotkey_poll = if !app.hotkeys_disabled_wayland && app.hotkey_manager.is_some() && app.hotkey_enabled {
         time::every(Duration::from_millis(100)).map(|_| Message::HotkeyPressed)
     } else {
         Subscription::none()

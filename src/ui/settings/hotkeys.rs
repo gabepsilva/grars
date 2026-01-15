@@ -21,65 +21,78 @@ pub fn hotkey_settings_section<'a>(app: &'a crate::model::App) -> Element<'a, Me
     // Format hotkey display string
     let hotkey_display = format_hotkey_display(&app.hotkey_config);
     
-    // Hotkey enabled checkbox
-    let hotkey_checkbox = checkbox(app.hotkey_enabled)
-        .label(format!("Enable global hotkey ({})", hotkey_display))
-        .on_toggle(Message::HotkeyToggled)
+    // Check if hotkeys are disabled due to Wayland/Hyprland
+    let is_disabled = app.hotkeys_disabled_wayland;
+    
+    // Hotkey enabled checkbox (disabled if on Wayland/Hyprland)
+    let checkbox_label = format!("Enable global hotkey ({})", hotkey_display);
+    let mut hotkey_checkbox = checkbox(if is_disabled { false } else { app.hotkey_enabled })
+        .label(checkbox_label)
         .style(white_checkbox_style);
+    if !is_disabled {
+        hotkey_checkbox = hotkey_checkbox.on_toggle(Message::HotkeyToggled);
+    }
     
-    // Set Hotkey button
-    let set_button_text = if app.listening_for_hotkey {
-        "Cancel"
-    } else {
-        "Set Hotkey"
-    };
+    // Set Hotkey button (disabled if on Wayland/Hyprland)
+    let set_button_text = if app.listening_for_hotkey { "Cancel" } else { "Set Hotkey" };
+    let mut set_button = button(white_text(set_button_text, 12))
+        .style(circle_button_style)
+        .padding([6.0, 12.0]);
+    if !is_disabled {
+        set_button = set_button.on_press(if app.listening_for_hotkey {
+            Message::StopListeningForHotkey
+        } else {
+            Message::StartListeningForHotkey
+        });
+    }
     
-    let set_button = button(
-        white_text(set_button_text, 12)
-    )
-    .style(circle_button_style)
-    .padding([6.0, 12.0])
-    .on_press(if app.listening_for_hotkey {
-        Message::StopListeningForHotkey
-    } else {
-        Message::StartListeningForHotkey
-    });
-    
-    // Listening status text
-    let status_text = if app.listening_for_hotkey {
+    // Status/info message (listening status or Wayland/Hyprland info)
+    let status_message: Option<Element<'a, Message>> = if app.listening_for_hotkey && !is_disabled {
         Some(white_text("Press your key combination...", 11)
             .style(|_theme| iced::widget::text::Style {
                 color: Some(Color::from_rgb(0.4, 0.6, 1.0)),
-            }))
+            })
+            .into())
+    } else if is_disabled {
+        Some(
+            row![
+                white_text("ⓘ", 14)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some(Color::from_rgb(0.3, 0.6, 1.0)),
+                    }),
+                Space::new().width(Length::Fixed(6.0)),
+                white_text("Not supported on Wayland with Hyprland. Please set up key bindings in Hyprland config.", 11)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some(Color::from_rgba(1.0, 1.0, 1.0, 0.7)),
+                    }),
+            ]
+            .align_y(Alignment::Center)
+            .spacing(0)
+            .into()
+        )
     } else {
         None
     };
     
-    let hotkey_control = if let Some(status) = status_text {
-        column![
-            row![
-                hotkey_checkbox,
-                Space::new().width(Length::Fixed(12.0)),
-                set_button,
-            ]
-            .align_y(Alignment::Center)
-            .spacing(0),
-            Space::new().height(Length::Fixed(6.0)),
-            status,
+    let hotkey_control = column![
+        row![
+            hotkey_checkbox,
+            Space::new().width(Length::Fixed(12.0)),
+            set_button,
         ]
-        .spacing(0)
-    } else {
-        column![
-            row![
-                hotkey_checkbox,
-                Space::new().width(Length::Fixed(12.0)),
-                set_button,
+        .align_y(Alignment::Center)
+        .spacing(0),
+        if let Some(msg) = status_message {
+            column![
+                Space::new().height(Length::Fixed(6.0)),
+                msg,
             ]
-            .align_y(Alignment::Center)
-            .spacing(0),
-        ]
-        .spacing(0)
-    };
+            .spacing(0)
+        } else {
+            column![].spacing(0)
+        },
+    ]
+    .spacing(0);
 
     container(
         row![

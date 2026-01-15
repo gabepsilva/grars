@@ -1066,6 +1066,11 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::HotkeyConfigChanged(config) => {
+            // Ignore if hotkeys are disabled due to Wayland/Hyprland
+            if app.hotkeys_disabled_wayland {
+                return Task::none();
+            }
+            
             info!("Hotkey configuration changed");
             app.hotkey_config = config.clone();
             
@@ -1086,6 +1091,11 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::HotkeyToggled(enabled) => {
+            // Ignore if hotkeys are disabled due to Wayland/Hyprland
+            if app.hotkeys_disabled_wayland {
+                return Task::none();
+            }
+            
             info!(enabled, "Hotkey toggled");
             app.hotkey_enabled = enabled;
             
@@ -1110,6 +1120,11 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::StartListeningForHotkey => {
+            // Ignore if hotkeys are disabled due to Wayland/Hyprland
+            if app.hotkeys_disabled_wayland {
+                return Task::none();
+            }
+            
             info!("Starting to listen for hotkey input");
             app.listening_for_hotkey = true;
             app.error_message = None; // Clear any previous errors
@@ -1122,6 +1137,11 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::HotkeyCaptured(key, modifiers) => {
+            // Ignore if hotkeys are disabled due to Wayland/Hyprland
+            if app.hotkeys_disabled_wayland {
+                app.listening_for_hotkey = false;
+                return Task::none();
+            }
             info!(?key, ?modifiers, "Hotkey combination captured");
             
             // Convert Iced key/modifiers to global_hotkey format

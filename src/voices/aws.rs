@@ -343,7 +343,9 @@ pub fn get_available_languages(
     // Sort by language code for consistent display
     lang_list.sort_by_key(|(code, _)| code.clone());
 
-    debug!(count = lang_list.len(), "Extracted available languages from AWS voices");
+    // Note: This function is called during view rendering, so we use trace instead of debug
+    // to avoid excessive logging
+    trace!(count = lang_list.len(), "Extracted available languages from AWS voices");
     lang_list
 }
 
