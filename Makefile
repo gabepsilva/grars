@@ -18,6 +18,20 @@ build:
 		rustup target add $(TARGET) 2>/dev/null || true; \
 		cargo build --release --target $(TARGET); \
 		echo "✓ Built: target/$(TARGET)/release/$(BINARY_NAME)"; \
+		\
+		PLATFORM=$$(echo $(TARGET) | sed -E 's/.*-(linux|windows|darwin).*/\1/'); \
+		ARCH=$$(echo $(TARGET) | sed -E 's/^([^-]+).*/\1/'); \
+		if [ "$$PLATFORM" = "darwin" ]; then PLATFORM="macos"; fi; \
+		if [ "$$ARCH" = "x86_64" ]; then ARCH="x86_64"; \
+		elif [ "$$ARCH" = "aarch64" ]; then ARCH="aarch64"; \
+		elif [ "$$ARCH" = "armv7" ]; then ARCH="armv7"; \
+		else ARCH="$$ARCH"; fi; \
+		NEW_NAME="$(BINARY_NAME)-$$PLATFORM-$$ARCH"; \
+		BUILT_BINARY="target/$(TARGET)/release/$(BINARY_NAME)"; \
+		if [ -f "$$BUILT_BINARY" ]; then \
+			cp "$$BUILT_BINARY" "target/release/$$NEW_NAME"; \
+			echo "✓ Copied to: target/release/$$NEW_NAME"; \
+		fi; \
 	else \
 		echo "Building release binary..."; \
 		cargo build --release; \
@@ -85,10 +99,12 @@ help:
 	@echo ""
 	@echo "Cross-compilation (optional):"
 	@echo "  Set TARGET environment variable to build for different platforms:"
-	@echo "    TARGET=x86_64-unknown-linux-gnu make build    # Linux x86_64"
-	@echo "    TARGET=aarch64-unknown-linux-gnu make build   # Linux ARM64"
-	@echo "    TARGET=x86_64-apple-darwin make build         # macOS x86_64"
-	@echo "    TARGET=aarch64-apple-darwin make build        # macOS ARM64 (Apple Silicon)"
+	@echo "    TARGET=x86_64-unknown-linux-gnu make build    # Linux x86_64 -> insight-reader-linux-x86_64"
+	@echo "    TARGET=aarch64-unknown-linux-gnu make build   # Linux ARM64 -> insight-reader-linux-aarch64"
+	@echo "    TARGET=x86_64-apple-darwin make build         # macOS x86_64 -> insight-reader-macos-x86_64"
+	@echo "    TARGET=aarch64-apple-darwin make build        # macOS ARM64 -> insight-reader-macos-aarch64"
+	@echo ""
+	@echo "  Cross-compiled binaries are copied to target/release/ with platform-arch naming"
 	@echo ""
 	@echo "Cross-compilation Requirements:"
 	@echo "  1. Install target: rustup target add <target>"
