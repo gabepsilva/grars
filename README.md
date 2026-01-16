@@ -114,9 +114,14 @@ While it should work on other platforms, these are the primary tested environmen
 <div align="center">
 
 ### Main Window
-<img src="assets/screenshots/main.png" alt="Main Window" width="300">
+<img src="assets/screenshots/main.png" alt="Main Window" width="400">
 
 *Floating borderless window with waveform visualization and playback controls*
+
+### OCR Screenshot Capture
+<img src="assets/screenshots/ocr-capture.png" alt="OCR Screenshot Capture" width="500">
+
+*Capture screenshots and extract text using native OCR (Windows Media OCR, macOS Vision, Linux EasyOCR)*
 
 ### Settings Window
 <img src="assets/screenshots/configurations.png" alt="Settings Window" width="600">
@@ -124,14 +129,9 @@ While it should work on other platforms, these are the primary tested environmen
 *Comprehensive settings with provider selection, voice management, and configuration options*
 
 ### Voice Download Interface
-<img src="assets/screenshots/voice-download.png" alt="Voice Download Interface" width="600">
+<img src="assets/screenshots/voice-download.png" alt="Voice Download Interface" width="350">
 
 *Browse and download Piper voices with language flags and voice preview*
-
-### Hotkey Configuration
-<img src="assets/screenshots/hotkey-config.png" alt="Hotkey Configuration" width="400">
-
-*Configure global hotkeys with live capture - works on Windows and macOS*
 
 ### System Tray Integration
 <table>
@@ -152,11 +152,6 @@ While it should work on other platforms, these are the primary tested environmen
 </table>
 
 *Quick access from system tray with menu options and configured hotkey display*
-
-### OCR Screenshot Capture
-<img src="assets/screenshots/ocr-capture.png" alt="OCR Screenshot Capture" width="500">
-
-*Capture screenshots and extract text using native OCR (Windows Media OCR, macOS Vision, Linux EasyOCR)*
 
 </div>
 
@@ -297,6 +292,7 @@ Logs are written to:
 - [ ] Audio export functionality
 - [ ] OCR Text formating and export functionality
 - [ ] Kokoro Voices
+- [ ] Auto Start (Windows, Mac and Linux)
 
 
 </td>
