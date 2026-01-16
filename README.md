@@ -2,6 +2,9 @@
 
 <div align="center">
 <img src="assets/logo.svg" height="128">
+<br/>  
+<br/>  
+
 
 ![Rust](https://img.shields.io/badge/Rust-2021+-orange?style=for-the-badge&logo=rust)
 ![Piper](https://img.shields.io/badge/Piper-TTS-green?style=for-the-badge)
@@ -15,9 +18,9 @@
 
 <div align="center">
 
-<img src="marketing/windows-logo.svg" height="64" alt="Windows">
-<img src="marketing/macos-logo.svg" height="64" alt="macOS">
-<img src="marketing/linux-logo.svg" height="64" alt="Linux">
+<img src="assets/marketing/windows-logo.svg" height="64" alt="Windows">
+<img src="assets/marketing/macos-logo.svg" height="64" alt="macOS">
+<img src="assets/marketing/linux-logo.svg" height="64" alt="Linux">
 
 </div>
 
@@ -88,19 +91,22 @@ iwr https://insightreader.xyz/install.ps1 | iex
 ## 📊 Tested Platforms
 This project runs extensive testing for reliability and maintainability.
 
+<div align="center">
+
 **Release tested on:**
 
 | Platform | Desktop Environment / WM | Status |
 |----------|------------------------|--------|
-| <img src="marketing/macos-logo.svg" height="16" alt="macOS"> **macOS** | Apple Silicon (M1/M2/M3) | ✅ Tested |
-| <img src="marketing/macos-logo.svg" height="16" alt="macOS"> **macOS** | Intel | ✅ Tested |
-| <img src="marketing/windows-logo.svg" height="16" alt="Windows"> **Windows 11** | Desktop | ✅ Tested |
-| <img src="marketing/windows-logo.svg" height="16" alt="Windows"> **Windows 10** | Desktop | ✅ Tested |
-| <img src="marketing/ubuntu-logo.svg" height="16" alt="Ubuntu"> **Ubuntu** | <img src="marketing/gnome-logo.svg" height="16" alt="GNOME"> GNOME (Wayland) | ✅ Tested |
-| <img src="marketing/fedora-logo.svg" height="16" alt="Fedora"> **Fedora** | <img src="marketing/gnome-logo.svg" height="16" alt="GNOME"> GNOME (Wayland) | ✅ Tested |
-| <img src="marketing/manjaro-logo.svg" height="16" alt="Manjaro"> **Manjaro Linux** | <img src="marketing/kde-logo.svg" height="16" alt="KDE"> KDE (Wayland) | ✅ Tested |
-| <img src="marketing/arch-logo.svg" height="16" alt="Arch Linux"> **Arch Linux** | <img src="marketing/hyprland-logo.svg" height="16" alt="Hyprland"> Hyprland (Wayland) | ✅ Tested |
+| <img src="assets/marketing/macos-logo.svg" height="16" alt="macOS"> **macOS** | Apple Silicon (M1/M2/M3) | ✅ Tested |
+| <img src="assets/marketing/macos-logo.svg" height="16" alt="macOS"> **macOS** | Intel | ✅ Tested |
+| <img src="assets/marketing/windows-logo.svg" height="16" alt="Windows"> **Windows 11** | Desktop | ✅ Tested |
+| <img src="assets/marketing/windows-logo.svg" height="16" alt="Windows"> **Windows 10** | Desktop | ✅ Tested |
+| <img src="assets/marketing/ubuntu-logo.svg" height="16" alt="Ubuntu"> **Ubuntu** | <img src="assets/marketing/gnome-logo.svg" height="16" alt="GNOME"> GNOME (Wayland) | ✅ Tested |
+| <img src="assets/marketing/fedora-logo.svg" height="16" alt="Fedora"> **Fedora** | <img src="assets/marketing/gnome-logo.svg" height="16" alt="GNOME"> GNOME (Wayland) | ✅ Tested |
+| <img src="assets/marketing/manjaro-logo.svg" height="16" alt="Manjaro"> **Manjaro Linux** | <img src="assets/marketing/kde-logo.svg" height="16" alt="KDE"> KDE (Wayland) | ✅ Tested |
+| <img src="assets/marketing/arch-logo.svg" height="16" alt="Arch Linux"> **Arch Linux** | <img src="assets/marketing/hyprland-logo.svg" height="16" alt="Hyprland"> Hyprland (Wayland) | ✅ Tested |
 
+</div>
 While it should work on other platforms, these are the primary tested environments.
 
 ## 📸 Screenshots
@@ -116,6 +122,41 @@ While it should work on other platforms, these are the primary tested environmen
 <img src="assets/screenshots/configurations.png" alt="Settings Window" width="600">
 
 *Comprehensive settings with provider selection, voice management, and configuration options*
+
+### Voice Download Interface
+<img src="assets/screenshots/voice-download.png" alt="Voice Download Interface" width="600">
+
+*Browse and download Piper voices with language flags and voice preview*
+
+### Hotkey Configuration
+<img src="assets/screenshots/hotkey-config.png" alt="Hotkey Configuration" width="400">
+
+*Configure global hotkeys with live capture - works on Windows and macOS*
+
+### System Tray Integration
+<table>
+<tr>
+<td align="center">
+<strong>Windows</strong><br>
+<img src="assets/screenshots/tray-windows.png" alt="Windows System Tray" width="200">
+</td>
+<td align="center">
+<strong>macOS</strong><br>
+<img src="assets/screenshots/tray-macos.png" alt="macOS Menu Bar" width="200">
+</td>
+<td align="center">
+<strong>Linux</strong><br>
+<img src="assets/screenshots/tray-linux.png" alt="Linux System Tray" width="200">
+</td>
+</tr>
+</table>
+
+*Quick access from system tray with menu options and configured hotkey display*
+
+### OCR Screenshot Capture
+<img src="assets/screenshots/ocr-capture.png" alt="OCR Screenshot Capture" width="500">
+
+*Capture screenshots and extract text using native OCR (Windows Media OCR, macOS Vision, Linux EasyOCR)*
 
 </div>
 
@@ -211,8 +252,6 @@ Logs are written to:
   - Grant accessibility permissions: **System Preferences/Settings → Security & Privacy → Privacy → Accessibility**
   - Add Insight Reader (or Terminal if running from terminal) to the allowed apps list
   - Try selecting text before running Insight Reader
-- **Linux**:
-  - Ensure you have `wl-clipboard` (Wayland) or `xclip`/`xsel` (X11) installed
 
 **"Screenshot capture not working"** (Windows)
 - Windows uses native Windows Media OCR API (no PowerShell required)

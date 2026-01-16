@@ -495,31 +495,46 @@ pub fn settings_window_view<'a>(app: &'a App) -> Element<'a, Message> {
     .style(section_style);
 
     // Natural Reading section
-    let text_cleanup_control = row![
-        checkbox(app.text_cleanup_enabled)
-            .label("Enable Natural Reading (cloud-powered text enhancement)")
-            .on_toggle(Message::TextCleanupToggled)
-            .style(white_checkbox_style),
-        Space::new().width(Length::Fixed(8.0)),
-        // Info icon button (circled i)
-        button(
-            container(
-                white_text("ⓘ", 16)
-                    .style(|_theme| iced::widget::text::Style {
-                        color: Some(Color::from_rgb(0.3, 0.6, 1.0)),
-                    })
+    let text_cleanup_control = column![
+        row![
+            checkbox(app.text_cleanup_enabled)
+                .label("Enable Natural Reading (cloud-powered text enhancement)")
+                // Checkbox disabled - feature work in progress
+                .style(white_checkbox_style),
+            Space::new().width(Length::Fixed(8.0)),
+            // Info icon button (circled i)
+            button(
+                container(
+                    white_text("ⓘ", 16)
+                        .style(|_theme| iced::widget::text::Style {
+                            color: Some(Color::from_rgb(0.3, 0.6, 1.0)),
+                        })
+                )
+                .width(Length::Fixed(24.0))
+                .height(Length::Fixed(24.0))
+                .center_x(Length::Fixed(24.0))
+                .center_y(Length::Fixed(24.0))
             )
+            .style(transparent_button_style)
             .width(Length::Fixed(24.0))
             .height(Length::Fixed(24.0))
-            .center_x(Length::Fixed(24.0))
-            .center_y(Length::Fixed(24.0))
-        )
-        .style(transparent_button_style)
-        .width(Length::Fixed(24.0))
-        .height(Length::Fixed(24.0))
-        .on_press(Message::OpenTextCleanupInfo),
+            .on_press(Message::OpenTextCleanupInfo),
+        ]
+        .align_y(Alignment::Center)
+        .spacing(0),
+        column![
+            Space::new().height(Length::Fixed(6.0)),
+            row![
+                white_text("Coming soon", 11)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some(Color::from_rgba(1.0, 1.0, 1.0, 0.7)),
+                    }),
+            ]
+            .align_y(Alignment::Center)
+            .spacing(0),
+        ]
+        .spacing(0),
     ]
-    .align_y(Alignment::Center)
     .spacing(0);
 
     let text_cleanup_section = container(
