@@ -486,21 +486,24 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             if let Some(ref t) = text {
                 info!(bytes = t.len(), preview = %t.chars().take(50).collect::<String>(), "Text selected");
             } else {
-                info!("No text selected - app will wait for text or close");
+                info!("No text selected - app will stay visible and wait for text");
             }
 
             // Initialize TTS if window is already open, otherwise store for later
-            if let Some(window_id) = app.main_window_id {
+            if app.main_window_id.is_some() {
                 if let Some(text) = text {
                     return process_text_for_tts(app, text, "SelectedTextFetched");
                 }
-                warn!("No text selected - closing window");
-                return window::close(window_id);
+                // No text selected - keep window visible so user can interact with the app
+            } else {
+                // Window not ready yet, store text for WindowOpened handler (only if text exists)
+                if text.is_some() {
+                    app.pending_text = text;
+                    trace!("Window not ready yet, text stored for later initialization");
+                } else {
+                    trace!("Window not ready yet, no text to store");
+                }
             }
-
-            // Window not ready yet, store text for WindowOpened handler
-            app.pending_text = text;
-            trace!("Window not ready yet, text stored for later initialization");
             Task::none()
         }
         Message::TextCleanupResponse(result) => {

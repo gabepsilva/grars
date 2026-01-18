@@ -32,7 +32,6 @@ global-hotkey = "0.5"  # Global hotkey support
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.9" # Core Foundation types for macOS Accessibility API
 macos-accessibility-client = "0.0.1" # Accessibility permissions check
-enigo = "0.2" # Keyboard simulation for Cmd+C
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"  # GTK for system tray icon support on Linux
