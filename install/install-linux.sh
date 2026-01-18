@@ -45,19 +45,8 @@ check_and_install_dependencies() {
         log_success "espeak-ng found"
     fi
     
-    # Check EasyOCR (for OCR) - will be installed via pip
-    # We check if python3 and pip are available instead
-    if ! command_exists python3; then
-        # python3 check is already done below, so we'll handle it there
-        log_info "Python3 will be checked separately"
-    else
-        # Check if easyocr is already installed
-        if python3 -c "import easyocr" 2>/dev/null; then
-            log_success "EasyOCR found (already installed)"
-        else
-            log_info "EasyOCR will be installed via pip"
-        fi
-    fi
+    # EasyOCR will be installed in the venv via pip (see install_piper in common-bash.sh)
+    # Build dependencies (gcc, g++, python3-devel) are checked below
 
     # Check Python3
     local python_missing=false
@@ -320,7 +309,7 @@ check_and_install_dependencies() {
         fi
     fi
     
-    # EasyOCR is now installed in the venv (see install_piper in common-bash.sh)
+    # EasyOCR will be installed in the venv during install_piper (see common-bash.sh)
     # No need to install it system-wide
     
     # Clipboard support is handled by arboard crate (no verification needed)
